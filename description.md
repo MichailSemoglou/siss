@@ -43,7 +43,7 @@ This applies a duotone effect with deep purple for dark areas and bright yellow-
 siss input.mp4 output.mp4 --effect halftone --symbol_type slash --symbol_size 20 --color1 56 12 45 --color2 217 237 3
 ```
 
-This applies a halftone effect with asterisk symbols of varying sizes.
+This applies a halftone effect with slash symbols of varying sizes.
 
 ## Documentation
 
