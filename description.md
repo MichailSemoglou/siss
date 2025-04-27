@@ -40,7 +40,7 @@ This applies a duotone effect with deep purple for dark areas and bright yellow-
 ![Halftone Example](https://raw.githubusercontent.com/MichailSemoglou/siss/main/examples/halftone_example.jpg)
 
 ```bash
-siss input.mp4 output.mp4 --effect halftone --symbol_type asterisk --symbol_size 12
+siss input.mp4 output.mp4 --effect halftone --symbol_type slash --symbol_size 20
 ```
 
 This applies a halftone effect with asterisk symbols of varying sizes.
