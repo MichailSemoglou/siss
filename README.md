@@ -37,7 +37,7 @@ A command-line utility for applying artistic effects to videos.
 ### Option 2: Install from Source
 
 ```bash
-pip install siss==0.1.0
+pip install siss
 ```
 
 ## Usage
