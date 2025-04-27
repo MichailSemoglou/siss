@@ -5,8 +5,8 @@ Video effects CLI tool for applying duotone and halftone effects to videos.
 import argparse
 import sys
 import os
-from duotone import apply_duotone
-from halftone import apply_halftone
+from src.duotone import apply_duotone
+from src.halftone import apply_halftone
 from src.utils.video_processing import get_codec_for_file
 
 
