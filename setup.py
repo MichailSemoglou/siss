@@ -1,9 +1,34 @@
 from setuptools import setup, find_packages
 from pathlib import Path
 
-# Read the long description from the description.md file
-this_directory = Path(__file__).parent
-long_description = (this_directory / "description.md").read_text()
+# Try to read the long description from description.md
+try:
+    this_directory = Path(__file__).parent
+    long_description = (this_directory / "description.md").read_text()
+except Exception:
+    # Fallback description if file is not found
+    long_description = """
+# Siss
+
+A command-line utility for applying artistic effects to videos.
+
+## Key Features
+
+- **Duotone Effect**: Creates stylish two-color videos, mapping colors to dark and light areas
+- **Halftone Effect**: Creates artistic videos using symbol patterns that vary in size based on brightness
+- **Cross-platform Compatibility**: Works on Windows, macOS, and Linux with automatic codec detection
+- **Progress Tracking**: Shows real-time processing progress with estimated completion time
+
+## Quick Start
+
+After installation, use Siss as a command-line tool:
+
+```bash
+siss input_video.mp4 output_video.mp4 --effect duotone
+```
+
+For complete documentation, visit the [GitHub repository](https://github.com/MichailSemoglou/siss).
+"""
 
 setup(
     name="siss",
