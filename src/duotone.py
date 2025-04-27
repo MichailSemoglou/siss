@@ -5,8 +5,8 @@ import cv2
 import numpy as np
 import os
 from tqdm import tqdm
-from utils.video_processing import get_codec_for_file
-from codec_fix import create_video_writer
+from src.utils.video_processing import get_codec_for_file
+from src.codec_fix import create_video_writer
 
 
 def apply_duotone(video_path, output_path, color1_rgb, color2_rgb, use_codec_fix=False):
