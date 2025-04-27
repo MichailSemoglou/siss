@@ -17,7 +17,7 @@ setup(
     python_requires=">=3.6",
     entry_points={
         "console_scripts": [
-            "siss=main:main",
+            "siss=src.main:main",
         ],
     },
     classifiers=[
