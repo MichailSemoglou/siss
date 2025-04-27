@@ -7,7 +7,7 @@ import sys
 import os
 from duotone import apply_duotone
 from halftone import apply_halftone
-from utils.video_processing import get_codec_for_file
+from src.utils.video_processing import get_codec_for_file
 
 
 def validate_file_path(file_path, check_exists=True):
