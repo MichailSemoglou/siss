@@ -32,7 +32,7 @@ For complete documentation, visit the [GitHub repository](https://github.com/Mic
 
 setup(
     name="siss",
-    version="0.1.2",
+    version="0.1.3",
     description="A command-line utility for applying artistic effects to videos",
     long_description=long_description,
     long_description_content_type="text/markdown",
