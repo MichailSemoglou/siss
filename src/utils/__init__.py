@@ -1,3 +1,3 @@
 """
-Utility modules for the Video Effects Tool.
+Utility modules for Siss.
 """
