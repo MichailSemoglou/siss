@@ -48,6 +48,12 @@ pip install git+https://github.com/MichailSemoglou/siss.git
 python -m src.main input_video.mp4 output_video.mp4 --effect duotone
 ```
 
+Or if installed using pip:
+
+```bash
+siss input_video.mp4 output_video.mp4 --effect duotone
+```
+
 The tool supports various video formats including MP4, MOV, AVI, and more. The output format is determined by the file extension you specify for the output file.
 
 ### Duotone Effect
