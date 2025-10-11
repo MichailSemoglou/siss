@@ -1,0 +1,5 @@
+Video Source Citation:
+
+NASA Johnson Space Center. (2013). ISS video resource exterior views 720p [Video]. Internet Archive. https://archive.org/details/ISSVideoResourceExteriorViews720p
+
+This video footage is used for demonstrating the video effects capabilities of Siss. Example images in this directory show the results of applying the duotone and halftone effects to frames from this video.

@@ -30,16 +30,20 @@ siss input_video.mp4 output_video.mp4 --effect duotone
 ![Duotone Example](https://raw.githubusercontent.com/MichailSemoglou/siss/main/examples/duotone_example.jpg)
 
 ```bash
-siss input.mp4 output.mp4 --effect duotone --color1 255 0 0 --color2 0 255 255
+siss input.mp4 output.mp4 --effect duotone --color1 56 12 45 --color2 217 237 3
 ```
+
+This applies a duotone effect with deep purple for dark areas and bright yellow-green for light areas.
 
 ### Halftone Effect
 
 ![Halftone Example](https://raw.githubusercontent.com/MichailSemoglou/siss/main/examples/halftone_example.jpg)
 
 ```bash
-siss input.mp4 output.mp4 --effect halftone --symbol_type asterisk --symbol_size 12
+siss input.mp4 output.mp4 --effect halftone --symbol_type slash --symbol_size 20 --color1 56 12 45 --color2 217 237 3
 ```
+
+This applies a halftone effect with asterisk symbols of varying sizes.
 
 ## Documentation
 
