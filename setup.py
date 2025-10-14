@@ -32,15 +32,17 @@ For complete documentation, visit the [GitHub repository](https://github.com/Mic
 
 setup(
     name="siss",
-    version="0.1.3",
+    version="0.1.4",
     description="A command-line utility for applying artistic effects to videos",
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="Michail Semoglou",
     author_email="m.semoglou@qide.studio",
     url="https://github.com/MichailSemoglou/siss",
-    packages=find_packages(where="src"),
+    license="MIT",
+    packages=["utils"],
     package_dir={"": "src"},
+    py_modules=["main", "duotone", "halftone", "codec_fix"],
     install_requires=[
         "opencv-python>=4.5.0",
         "numpy>=1.20.0",
@@ -49,7 +51,7 @@ setup(
     python_requires=">=3.6",
     entry_points={
         "console_scripts": [
-            "siss=src.main:main",
+            "siss=main:main",
         ],
     },
     classifiers=[
