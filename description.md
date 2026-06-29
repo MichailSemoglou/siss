@@ -1,13 +1,18 @@
 # Siss
 
-A command-line utility for applying artistic effects to videos.
+A command-line tool for applying duotone and halftone effects to video files.
+Duotone maps per-pixel luminance to a linear blend between two user-supplied
+RGB colors; halftone renders plus, asterisk, or slash symbols at
+luminance-proportional sizes. Accepts hex strings, CSS named colors, RGB
+triples, and named two-color palettes.
+v0.2.0 · released June 2026 · MIT
 
-## Key Features
+## Features
 
-- **Duotone Effect**: Creates stylish two-color videos, mapping colors to dark and light areas
-- **Halftone Effect**: Creates artistic videos using symbol patterns that vary in size based on brightness
-- **Cross-platform Compatibility**: Works on Windows, macOS, and Linux with automatic codec detection
-- **Progress Tracking**: Shows real-time processing progress with estimated completion time
+- **Duotone** – maps per-pixel luminance to a linear gradient between two RGB colors; `color1` is applied to dark areas, `color2` to light areas
+- **Halftone** – renders plus, asterisk, or slash symbols at sizes proportional to local luminance, with independent symbol and background colors
+- **Color input** – accepts 3- and 6-digit hex strings (with or without `#`), case-insensitive CSS named colors, RGB integer triples, and named two-color palettes via `--palette`
+- **Codec selection** – probes `cv2.VideoWriter_fourcc` candidates per output format and OS; falls back through a priority list until a working codec is found
 
 ## Installation
 
@@ -17,10 +22,20 @@ pip install siss
 
 ## Quick Start
 
-After installation, you can use Siss either as a command-line tool:
+After installation, run `siss` from the command line:
 
 ```bash
 siss input_video.mp4 output_video.mp4 --effect duotone
+```
+
+## Specifying Colors
+
+Colors accept hex strings, CSS names, RGB triples, or curated palettes:
+
+```bash
+siss input.mp4 output.mp4 --effect duotone --color1 "#3b1f4b" --color2 gold
+siss input.mp4 output.mp4 --effect duotone --palette sunset
+siss --list-palettes
 ```
 
 ## Example Effects
@@ -33,7 +48,7 @@ siss input_video.mp4 output_video.mp4 --effect duotone
 siss input.mp4 output.mp4 --effect duotone --color1 56 12 45 --color2 217 237 3
 ```
 
-This applies a duotone effect with deep purple for dark areas and bright yellow-green for light areas.
+Applies a duotone effect with deep purple mapped to dark areas and bright yellow-green to light areas.
 
 ### Halftone Effect
 
@@ -43,15 +58,15 @@ This applies a duotone effect with deep purple for dark areas and bright yellow-
 siss input.mp4 output.mp4 --effect halftone --symbol_type slash --symbol_size 20 --color1 56 12 45 --color2 217 237 3
 ```
 
-This applies a halftone effect with slash symbols of varying sizes.
+Applies a halftone effect with slash symbols at luminance-proportional sizes.
 
 ## Documentation
 
-For complete documentation, visit the [GitHub repository](https://github.com/MichailSemoglou/siss).
+See the [GitHub repository](https://github.com/MichailSemoglou/siss) for full documentation.
 
 ## Requirements
 
-- Python 3.6+
-- OpenCV (cv2)
+- Python 3.7+
+- OpenCV (`cv2`)
 - NumPy
 - tqdm
