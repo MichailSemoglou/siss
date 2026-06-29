@@ -1,1 +1,0 @@
-python3 -m src.main IMG_4196.MOV output_video_blue.mov --effect halftone --color1 235 235 235 --color2 20 20 235 --symbol_type plus --symbol_size 12
