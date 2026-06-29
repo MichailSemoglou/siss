@@ -197,3 +197,6 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+# VS Code Copilot instruction files (local development only)
+.github/instructions/

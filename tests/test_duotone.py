@@ -6,7 +6,7 @@ import os
 import tempfile
 import numpy as np
 import cv2
-from src.duotone import apply_duotone
+from duotone import apply_duotone
 
 
 class TestDuotone(unittest.TestCase):

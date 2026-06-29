@@ -4,4 +4,4 @@ Siss - Video Effects Tool package.
 A command-line utility for applying artistic effects to videos.
 """
 
-__version__ = '0.1.4'
+__version__ = '0.2.1'

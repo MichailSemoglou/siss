@@ -6,7 +6,7 @@ import os
 import tempfile
 import numpy as np
 import cv2
-from src.halftone import apply_halftone
+from halftone import apply_halftone
 
 
 class TestHalftone(unittest.TestCase):

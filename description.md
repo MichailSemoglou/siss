@@ -5,7 +5,6 @@ Duotone maps per-pixel luminance to a linear blend between two user-supplied
 RGB colors; halftone renders plus, asterisk, or slash symbols at
 luminance-proportional sizes. Accepts hex strings, CSS named colors, RGB
 triples, and named two-color palettes.
-v0.2.0 · released June 2026 · MIT
 
 ## Features
 

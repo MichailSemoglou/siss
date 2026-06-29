@@ -1,16 +1,25 @@
 # Siss
 
-A command-line utility for applying artistic effects to videos.
+A command-line tool for applying duotone and halftone effects to video files.
+Duotone maps per-pixel luminance to a linear blend between two user-supplied
+RGB colors; halftone renders plus, asterisk, or slash symbols at
+luminance-proportional sizes over a 3×3-pixel sampled grid. Accepts hex
+strings, CSS named colors, RGB triples, and named two-color palettes.
 
 ![GitHub license](https://img.shields.io/github/license/MichailSemoglou/siss)
-![Python version](https://img.shields.io/badge/python-3.6%2B-blue)
+![Python version](https://img.shields.io/badge/python-3.7%2B-blue)
+![PyPI version](https://img.shields.io/pypi/v/siss)
+![PyPI downloads](https://img.shields.io/pypi/dm/siss)
+![GitHub issues](https://img.shields.io/github/issues/MichailSemoglou/siss)
+![GitHub last commit](https://img.shields.io/github/last-commit/MichailSemoglou/siss)
 
 ## Features
 
-- **Duotone Effect**: Creates a video with two selected colors mapped to dark and light areas
-- **Halftone Effect**: Creates a video with symbol patterns of varying sizes to represent dark and light areas
-- **Cross-platform Compatibility**: Handles codec differences between operating systems
-- **Progress Tracking**: Shows real-time progress during video processing
+- **Duotone** – maps per-pixel luminance to a linear gradient between two RGB colors; `color1` is applied to dark areas, `color2` to light areas
+- **Halftone** – renders plus, asterisk, or slash symbols at sizes proportional to local luminance (3×3-pixel sampled average), with independent symbol and background colors
+- **Color input** – accepts 3- and 6-digit hex strings (with or without `#`), case-insensitive CSS named colors, RGB integer triples, and named two-color palettes via `--palette`
+- **Codec selection** – probes `cv2.VideoWriter_fourcc` candidates per output format and OS at runtime; falls back through a priority list until a working codec is found
+- **Output formats** – writes MP4, MOV, AVI, MKV, and WMV; the container is inferred from the output file extension
 
 ## Installation
 
@@ -24,6 +33,7 @@ A command-line utility for applying artistic effects to videos.
    ```
 
 2. Create a virtual environment (recommended):
+
    ```bash
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
@@ -45,86 +55,127 @@ pip install siss
 ### Basic Usage
 
 ```bash
-python -m src.main input_video.mp4 output_video.mp4 --effect duotone
-```
-
-Or if installed using pip:
-
-```bash
 siss input_video.mp4 output_video.mp4 --effect duotone
 ```
 
-The tool supports various video formats including MP4, MOV, AVI, and more. The output format is determined by the file extension you specify for the output file.
+For a source checkout without installing:
+
+```bash
+python3 src/main.py input_video.mp4 output_video.mp4 --effect duotone
+```
+
+The output format is determined by the file extension of the output path. Supported containers: MP4, MOV, AVI, MKV, WMV.
+
+### Specifying Colors
+
+Siss accepts colors in any of these forms:
+
+| Form                                         | Example                                   |
+| -------------------------------------------- | ----------------------------------------- |
+| Hex string (with/without `#`, 3- or 6-digit) | `--color1 "#ff0044"` or `--color1 ff0044` |
+| CSS named color                              | `--color1 rebeccapurple`                  |
+| RGB triple (original syntax)                 | `--color1 255 0 0`                        |
+
+> **Shell note:** quote hex values that start with `#` to prevent your shell from treating the character as a comment: `"#ff0044"`.
+
+You can also select a complete two-color look with `--palette`:
+
+```bash
+siss input_video.mp4 output_duotone.mp4 --effect duotone --palette sunset
+```
+
+Browse the built-in palettes:
+
+```bash
+siss --list-palettes
+```
+
+Individual `--color1` and `--color2` flags override single slots of a selected palette. Precedence: explicit flag > palette > default (red / cyan).
 
 ### Duotone Effect
 
 ```bash
-python -m src.main input_video.mp4 output_duotone.mp4 --effect duotone --color1 255 0 0 --color2 0 255 255
+siss input_video.mp4 output_duotone.mp4 --effect duotone --color1 255 0 0 --color2 0 255 255
 ```
 
-This applies a duotone effect with red for dark areas and cyan for light areas.
+Applies a duotone effect with red mapped to dark areas and cyan to light areas.
+
+Using a hex color and a CSS name:
+
+```bash
+siss input_video.mp4 output_duotone.mp4 --effect duotone --color1 "#3b1f4b" --color2 gold
+```
+
+Using a palette:
+
+```bash
+siss input_video.mp4 output_duotone.mp4 --effect duotone --palette cyberpunk
+```
 
 ### Halftone Effect
 
 ```bash
-python -m src.main input_video.mp4 output_halftone.mp4 --effect halftone --symbol_size 12 --symbol_type asterisk --color1 0 0 0 --color2 255 255 255
+siss input_video.mp4 output_halftone.mp4 --effect halftone --symbol_size 12 --symbol_type asterisk --color1 0 0 0 --color2 255 255 255
 ```
 
-This applies a halftone effect with black asterisks on a white background.
+Applies a halftone effect with black asterisks on a white background.
 
-### Codec Compatibility Fix
+### Codec Compatibility
 
-If you encounter issues with codecs (especially on different operating systems), use the `--use-codec-fix` option:
+If you encounter codec errors, add `--use-codec-fix`:
 
 ```bash
-python -m src.main input_video.mp4 output_video.mp4 --effect duotone --use-codec-fix
+siss input_video.mp4 output_video.mp4 --effect duotone --use-codec-fix
 ```
 
-This option uses an adaptive approach to find compatible codecs for your specific system.
+`--use-codec-fix` probes `cv2.VideoWriter_fourcc` candidates at startup and selects the first codec that opens successfully for the output container.
 
 ### Available Options
 
-- `--effect`: Choose between `duotone` or `halftone` (required)
-- `--color1`: First color in RGB format (default: 255 0 0, red)
-- `--color2`: Second color in RGB format (default: 0 255 255, cyan)
-- `--symbol_size`: Size of symbols for halftone effect (default: 10)
-- `--symbol_type`: Type of symbol for halftone effect (choices: plus, asterisk, slash, default: plus)
-- `--use-codec-fix`: Use adaptive codec selection for cross-platform compatibility
+- `--effect` – `duotone` or `halftone` (required)
+- `--color1` – first color: hex `#ff0044`, CSS name `rebeccapurple`, or RGB `255 0 0`. Default: red. Dark areas in duotone, symbols in halftone.
+- `--color2` – second color, same accepted forms. Default: cyan. Light areas in duotone, background in halftone.
+- `--palette` – named two-color palette (overrides the defaults; `--color1` and `--color2` override individual slots)
+- `--list-palettes` – print available palettes and exit
+- `--symbol_size` – symbol size for halftone (default: `10`)
+- `--symbol_type` – halftone symbol shape: `plus`, `asterisk`, or `slash` (default: `plus`)
+- `--use-codec-fix` – enable adaptive codec selection
 
 ## Examples
 
-### Creating a blue/yellow duotone effect:
+Blue/yellow duotone:
 
 ```bash
-python -m src.main video.mp4 blue_yellow.mp4 --effect duotone --color1 0 0 255 --color2 255 255 0
+siss video.mp4 blue_yellow.mp4 --effect duotone --color1 0 0 255 --color2 255 255 0
 ```
 
-### Creating a halftone effect with slash symbols:
+Halftone with slash symbols:
 
 ```bash
-python -m src.main video.mp4 halftone_slashes.mp4 --effect halftone --symbol_type slash --symbol_size 15
+siss video.mp4 halftone_slashes.mp4 --effect halftone --symbol_type slash --symbol_size 15
 ```
 
-### Using MOV files:
+MOV input and output:
 
 ```bash
-python -m src.main input.mov output.mov --effect duotone --color1 0 0 255 --color2 255 255 0
+siss input.mov output.mov --effect duotone --color1 0 0 255 --color2 255 255 0
 ```
 
 ## Project Structure
 
 - `src/`
-  - `main.py`: Command-line interface for the tool
-  - `duotone.py`: Contains the duotone effect implementation
-  - `halftone.py`: Contains the halftone effect implementation
-  - `codec_fix.py`: Handles cross-platform codec compatibility
+  - `main.py` – command-line interface and argument parsing
+  - `colors.py` – hex, CSS name, and RGB parsing; curated palette registry
+  - `duotone.py` – per-frame luminance-to-gradient mapping
+  - `halftone.py` – per-frame symbol rendering at luminance-proportional sizes
+  - `codec_fix.py` – adaptive `cv2.VideoWriter_fourcc` selection per OS and format
   - `utils/`
-    - `video_processing.py`: Utility functions for video handling
+    - `video_processing.py` – frame extraction, writing, and video property utilities
 
 ## Requirements
 
-- Python 3.6+
-- OpenCV (cv2)
+- Python 3.7+
+- OpenCV (`cv2`)
 - NumPy
 - tqdm
 
@@ -132,29 +183,29 @@ python -m src.main input.mov output.mov --effect duotone --color1 0 0 255 --colo
 
 ### Video Output Issues
 
-If you encounter issues with video output:
+If you encounter video output errors:
 
-1. Try using the `--use-codec-fix` option to automatically find a compatible codec
-2. Check that you have the necessary codecs installed for your operating system
-3. If creating MP4 files on Windows, try using AVI format instead
+1. Add `--use-codec-fix` to enable adaptive codec selection.
+2. Verify that the required codecs are installed for your operating system.
+3. On Windows, try AVI output if MP4 encoding fails.
 
-### Memory Limitations
+### Memory Usage
 
-For large videos, the tool processes frames sequentially to minimize memory usage. If you still experience memory issues:
+Frames are processed sequentially to keep memory use bounded. For large inputs:
 
-1. Try processing a shorter clip first
-2. Reduce the resolution of your input video
+1. Test on a short clip before processing the full video.
+2. Reduce the resolution of the input before passing it to `siss`.
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+To contribute:
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+1. Fork the repository.
+2. Create a feature branch: `git checkout -b feature/short-description`.
+3. Commit your changes: `git commit -m 'Add halftone slash rendering'`.
+4. Push to the branch: `git push origin feature/short-description`.
+5. Open a pull request describing what changed and why.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT. See the [LICENSE](LICENSE) file for terms.
