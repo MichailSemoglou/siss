@@ -2,9 +2,10 @@
 
 A command-line tool for applying duotone and halftone effects to video files.
 Duotone maps per-pixel luminance to a linear blend between two user-supplied
-RGB colors; halftone renders plus, asterisk, or slash symbols at
-luminance-proportional sizes over a 3×3-pixel sampled grid. Accepts hex
-strings, CSS named colors, RGB triples, and named two-color palettes.
+RGB colors; halftone renders plus, asterisk, slash, or dot symbols at
+luminance-proportional sizes over a 3×3-pixel sampled grid, on a square or
+hex-offset screen. Accepts hex strings, CSS named colors, RGB triples, and
+named two-color palettes.
 
 ![GitHub license](https://img.shields.io/github/license/MichailSemoglou/siss)
 ![Python version](https://img.shields.io/badge/python-3.7%2B-blue)
@@ -16,7 +17,7 @@ strings, CSS named colors, RGB triples, and named two-color palettes.
 ## Features
 
 - **Duotone** – maps per-pixel luminance to a linear gradient between two RGB colors; `color1` is applied to dark areas, `color2` to light areas
-- **Halftone** – renders plus, asterisk, or slash symbols at sizes proportional to local luminance (3×3-pixel sampled average), with independent symbol and background colors
+- **Halftone** – renders plus, asterisk, slash, or dot symbols at sizes proportional to local luminance (3×3-pixel sampled average), with independent symbol and background colors, over a square or hex-offset sampling grid
 - **Color input** – accepts 3- and 6-digit hex strings (with or without `#`), case-insensitive CSS named colors, RGB integer triples, and named two-color palettes via `--palette`
 - **Codec selection** – probes `cv2.VideoWriter_fourcc` candidates per output format and OS at runtime; falls back through a priority list until a working codec is found
 - **Output formats** – writes MP4, MOV, AVI, MKV, and WMV; the container is inferred from the output file extension
@@ -120,6 +121,12 @@ siss input_video.mp4 output_halftone.mp4 --effect halftone --symbol_size 12 --sy
 
 Applies a halftone effect with black asterisks on a white background.
 
+For the classic print-halftone look, use `dot` symbols on a `hex` grid, which staggers alternating rows by half a step to produce the interlocking dot screen of traditional print reproduction:
+
+```bash
+siss input_video.mp4 output_halftone.mp4 --effect halftone --symbol_type dot --grid_type hex --color1 0 0 0 --color2 255 255 255
+```
+
 ### Codec Compatibility
 
 If you encounter codec errors, add `--use-codec-fix`:
@@ -138,7 +145,8 @@ siss input_video.mp4 output_video.mp4 --effect duotone --use-codec-fix
 - `--palette` – named two-color palette (overrides the defaults; `--color1` and `--color2` override individual slots)
 - `--list-palettes` – print available palettes and exit
 - `--symbol_size` – symbol size for halftone (default: `10`)
-- `--symbol_type` – halftone symbol shape: `plus`, `asterisk`, or `slash` (default: `plus`)
+- `--symbol_type` – halftone symbol shape: `plus`, `asterisk`, `slash`, or `dot` (default: `plus`)
+- `--grid_type` – halftone sampling grid: `square` or `hex` (default: `square`); `hex` staggers alternating rows by half a step for a traditional print-halftone dot screen
 - `--use-codec-fix` – enable adaptive codec selection
 
 ## Examples
@@ -153,6 +161,12 @@ Halftone with slash symbols:
 
 ```bash
 siss video.mp4 halftone_slashes.mp4 --effect halftone --symbol_type slash --symbol_size 15
+```
+
+Classic print-style halftone dots on a hex-offset grid:
+
+```bash
+siss video.mp4 halftone_dots.mp4 --effect halftone --symbol_type dot --grid_type hex --symbol_size 15
 ```
 
 MOV input and output:

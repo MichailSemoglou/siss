@@ -154,9 +154,21 @@ def parse_arguments():
     parser.add_argument(
         "--symbol_type",
         type=str,
-        choices=["plus", "asterisk", "slash"],
+        choices=["plus", "asterisk", "slash", "dot"],
         default="plus",
         help="Symbol type for halftone effect",
+    )
+
+    parser.add_argument(
+        "--grid_type",
+        type=str,
+        choices=["square", "hex"],
+        default="square",
+        help=(
+            "Sampling grid for halftone effect. 'hex' staggers alternating "
+            "rows by half a step, giving the interlocking dot screen of a "
+            "traditional print halftone instead of a plain square lattice."
+        ),
     )
 
     # Add codec override options
@@ -251,6 +263,7 @@ def main():
                 color1_rgb,
                 color2_rgb,
                 symbol_type=args.symbol_type,
+                grid_type=args.grid_type,
                 use_codec_fix=args.use_codec_fix,
             )
 

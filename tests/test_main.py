@@ -38,6 +38,7 @@ def _ns(**kwargs):
         list_palettes=False,
         symbol_size=10,
         symbol_type="plus",
+        grid_type="square",
         use_codec_fix=False,
     )
     base.update(kwargs)
@@ -239,6 +240,27 @@ class TestMainVideoEffects(unittest.TestCase):
         # symbol_size is 3rd positional arg (index 2)
         self.assertEqual(call_args[0][2], 15)
         self.assertEqual(call_args[1].get("symbol_type"), "asterisk")
+
+    def test_halftone_dot_symbol_and_grid_type_forwarded(self):
+        with mock.patch("main.apply_halftone") as mock_ht:
+            with mock.patch(
+                "sys.argv",
+                [
+                    "siss",
+                    self.input_path,
+                    self.output_path,
+                    "--effect",
+                    "halftone",
+                    "--symbol_type",
+                    "dot",
+                    "--grid_type",
+                    "hex",
+                ],
+            ):
+                main()
+        _, kwargs = mock_ht.call_args
+        self.assertEqual(kwargs.get("symbol_type"), "dot")
+        self.assertEqual(kwargs.get("grid_type"), "hex")
 
     def test_output_directory_created_if_missing(self):
         nested_out = os.path.join(self.tmp.name, "newdir", "out.mp4")

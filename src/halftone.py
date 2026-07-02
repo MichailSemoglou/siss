@@ -10,7 +10,7 @@ from codec_fix import create_video_writer
 
 
 def apply_halftone(video_path, output_path, symbol_size, color1_rgb, color2_rgb, 
-                  symbol_type='plus', use_codec_fix=False):
+                  symbol_type='plus', grid_type='square', use_codec_fix=False):
     """
     Apply halftone pattern effect to a video.
 
@@ -20,19 +20,26 @@ def apply_halftone(video_path, output_path, symbol_size, color1_rgb, color2_rgb,
         symbol_size (int): Size of the largest symbol in the halftone effect
         color1_rgb (tuple): RGB color for symbols (r, g, b), values 0-255
         color2_rgb (tuple): RGB color for background (r, g, b), values 0-255
-        symbol_type (str): Type of symbol to use ('plus', 'asterisk', or 'slash')
+        symbol_type (str): Type of symbol to use ('plus', 'asterisk', 'slash', or 'dot')
+        grid_type (str): Sampling grid layout ('square' or 'hex'). 'hex' offsets
+            every other row by half a step, producing the staggered dot
+            screen used in traditional print halftone reproduction.
         use_codec_fix (bool): Whether to use codec compatibility fix
 
     Raises:
         FileNotFoundError: If the input video cannot be opened
-        ValueError: If the colors are not valid RGB values or invalid symbol_type
+        ValueError: If the colors are not valid RGB values, or if symbol_type
+            or grid_type is not one of the supported values
     """
     # Validate inputs
     if not all(0 <= c <= 255 for c in color1_rgb + color2_rgb):
         raise ValueError("RGB color values must be between 0 and 255")
     
-    if symbol_type not in ['plus', 'asterisk', 'slash']:
-        raise ValueError("Symbol type must be 'plus', 'asterisk', or 'slash'")
+    if symbol_type not in ['plus', 'asterisk', 'slash', 'dot']:
+        raise ValueError("Symbol type must be 'plus', 'asterisk', 'slash', or 'dot'")
+
+    if grid_type not in ['square', 'hex']:
+        raise ValueError("Grid type must be 'square' or 'hex'")
     
     if symbol_size <= 0:
         raise ValueError("Symbol size must be greater than 0")
@@ -66,7 +73,8 @@ def apply_halftone(video_path, output_path, symbol_size, color1_rgb, color2_rgb,
         symbol_functions = {
             'plus': _draw_plus_symbol,
             'asterisk': _draw_asterisk_symbol,
-            'slash': _draw_slash_symbol
+            'slash': _draw_slash_symbol,
+            'dot': _draw_dot_symbol
         }
         
         draw_symbol = symbol_functions[symbol_type]
@@ -91,7 +99,12 @@ def apply_halftone(video_path, output_path, symbol_size, color1_rgb, color2_rgb,
 
             # Create a halftone pattern with the chosen symbol
             for y in range(0, gray.shape[0], step):
-                for x in range(0, gray.shape[1], step):
+                # A hex grid staggers alternating rows by half a step, giving
+                # the interlocking dot screen of a traditional print halftone
+                # instead of a plain square lattice.
+                row_offset = step // 2 if grid_type == 'hex' and (y // step) % 2 == 1 else 0
+
+                for x in range(row_offset, gray.shape[1], step):
                     # Get pixel intensity
                     if y < gray.shape[0] and x < gray.shape[1]:
                         # Sample a small region for better averaging
@@ -176,3 +189,12 @@ def _draw_slash_symbol(halftone, center_x, center_y, size):
     x2 = min(halftone.shape[1] - 1, center_x + size)
     y2 = max(0, center_y - size)
     cv2.line(halftone, (x1, y1), (x2, y2), 0, 1)
+
+
+def _draw_dot_symbol(halftone, center_x, center_y, size):
+    """Draw a filled dot (circle) symbol on the halftone image.
+
+    This is the classic print-halftone symbol: a solid circle whose radius
+    scales with local luminance, in place of the plus/asterisk/slash glyphs.
+    """
+    cv2.circle(halftone, (center_x, center_y), size, 0, -1)

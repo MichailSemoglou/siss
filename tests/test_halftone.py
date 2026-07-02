@@ -77,7 +77,7 @@ class TestHalftone(unittest.TestCase):
         """Test different symbol types."""
         # Skip test if codec not available
         try:
-            symbol_types = ['plus', 'asterisk', 'slash']
+            symbol_types = ['plus', 'asterisk', 'slash', 'dot']
             
             for symbol_type in symbol_types:
                 output_path = os.path.join(self.temp_dir.name, f"test_{symbol_type}.mp4")
@@ -91,6 +91,28 @@ class TestHalftone(unittest.TestCase):
                     symbol_type=symbol_type
                 )
                 
+                # Verify the output exists
+                self.assertTrue(os.path.exists(output_path))
+        except cv2.error:
+            self.skipTest("Codec not available")
+
+    def test_grid_types(self):
+        """Test square and hex grid layouts."""
+        # Skip test if codec not available
+        try:
+            for grid_type in ['square', 'hex']:
+                output_path = os.path.join(self.temp_dir.name, f"test_grid_{grid_type}.mp4")
+
+                apply_halftone(
+                    self.input_path,
+                    output_path,
+                    symbol_size=8,
+                    color1_rgb=(0, 0, 0),
+                    color2_rgb=(255, 255, 255),
+                    symbol_type='dot',
+                    grid_type=grid_type
+                )
+
                 # Verify the output exists
                 self.assertTrue(os.path.exists(output_path))
         except cv2.error:
@@ -109,6 +131,13 @@ class TestHalftone(unittest.TestCase):
         # Test with invalid symbol type
         with self.assertRaises(ValueError):
             apply_halftone(self.input_path, self.output_path, 10, (0, 0, 0), (255, 255, 255), 'invalid_type')
+
+        # Test with invalid grid type
+        with self.assertRaises(ValueError):
+            apply_halftone(
+                self.input_path, self.output_path, 10, (0, 0, 0), (255, 255, 255),
+                grid_type='invalid_grid'
+            )
         
         # Test with invalid symbol size
         with self.assertRaises(ValueError):
