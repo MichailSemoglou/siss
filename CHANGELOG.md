@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking:** the `use_codec_fix` parameter from `apply_duotone` and `apply_halftone`. Callers using either function directly must drop the argument.
 - `pytest` and `setuptools` from `requirements.txt`; both moved to `requirements-dev.txt`.
 
+### Fixed
+
+- `MANIFEST.in` now includes `src/__init__.py`, so it is present in the sdist. Without it, `setup.py` could not read `__version__` while building the wheel from the sdist, and the PyPI publish step failed.
+
 ---
 
 ## [0.3.0] - 2026-07-02
