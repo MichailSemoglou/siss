@@ -18,7 +18,6 @@ from typing import List, Optional, Tuple
 from duotone import apply_duotone
 from halftone import apply_halftone
 from colors import parse_color, get_palette, list_palettes
-from utils.video_processing import get_codec_for_file
 
 
 def validate_file_path(file_path, check_exists=True):
@@ -171,13 +170,6 @@ def parse_arguments():
         ),
     )
 
-    # Add codec override options
-    parser.add_argument(
-        "--use-codec-fix",
-        action="store_true",
-        help="Use the codec compatibility fix for different platforms",
-    )
-
     return parser.parse_args()
 
 
@@ -253,7 +245,6 @@ def main():
                 args.output,
                 color1_rgb,
                 color2_rgb,
-                use_codec_fix=args.use_codec_fix,
             )
         elif args.effect == "halftone":
             apply_halftone(
@@ -264,7 +255,6 @@ def main():
                 color2_rgb,
                 symbol_type=args.symbol_type,
                 grid_type=args.grid_type,
-                use_codec_fix=args.use_codec_fix,
             )
 
     except (FileNotFoundError, ValueError) as e:

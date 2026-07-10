@@ -20,7 +20,6 @@ import numpy as np
 
 from utils.video_processing import (
     extract_frames,
-    get_codec_for_file,
     get_video_properties,
     load_video,
     process_video_frames,
@@ -47,38 +46,6 @@ def _make_test_video(path, width=160, height=120, frames=5, fps=30.0):
     for _ in range(frames):
         writer.write(np.zeros((height, width, 3), dtype=np.uint8))
     writer.release()
-
-
-# ---------------------------------------------------------------------------
-# get_codec_for_file
-# ---------------------------------------------------------------------------
-
-class TestGetCodecForFile(unittest.TestCase):
-    """Extension-to-codec mapping."""
-
-    def test_mp4(self):
-        self.assertEqual(get_codec_for_file("video.mp4"), "mp4v")
-
-    def test_avi(self):
-        self.assertEqual(get_codec_for_file("video.avi"), "XVID")
-
-    def test_mov(self):
-        self.assertEqual(get_codec_for_file("video.mov"), "mp4v")
-
-    def test_mkv(self):
-        self.assertEqual(get_codec_for_file("video.mkv"), "X264")
-
-    def test_wmv(self):
-        self.assertEqual(get_codec_for_file("video.wmv"), "WMV2")
-
-    def test_unknown_extension_defaults_to_mp4v(self):
-        self.assertEqual(get_codec_for_file("video.xyz"), "mp4v")
-
-    def test_uppercase_extension(self):
-        self.assertEqual(get_codec_for_file("VIDEO.MP4"), "mp4v")
-
-    def test_path_with_directories(self):
-        self.assertEqual(get_codec_for_file("/some/dir/clip.avi"), "XVID")
 
 
 # ---------------------------------------------------------------------------

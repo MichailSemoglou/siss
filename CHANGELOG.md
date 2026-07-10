@@ -5,6 +5,31 @@ All notable changes to the Siss project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-07-10
+
+### Added
+
+- `requirements-dev.txt` for development-only dependencies (`pytest`, `setuptools`), separated from the runtime `requirements.txt`.
+- `pyproject.toml` with pytest configuration (`testpaths`, `addopts`), replacing ad hoc test discovery.
+- `tests/test_integration.py`: end-to-end tests that run the real `main()` against synthetic gradient videos and check output dimensions, frame count, and pixel-level duotone and halftone effects.
+
+### Changed
+
+- `apply_duotone` and `apply_halftone` now delegate frame reading, writing, and progress reporting to the shared `process_video_frames` helper in `src/utils/video_processing.py`, removing duplicated capture and writer setup from both modules.
+- Codec selection is now always automatic, using `create_video_writer`; there is no longer a manual codec path to opt out of.
+- `setup.py` reads `__version__` from `src/__init__.py` instead of hardcoding the version string, making the package `__init__.py` the single source of truth.
+- `save_video` in `src/utils/video_processing.py` now writes frames inside a `try/finally` block, guaranteeing `video_writer.release()` and progress bar cleanup even if a write raises an exception.
+- Relaxed the per-channel pixel thresholds in the `test_duotone_colors_transform_frame` integration test to allow for lossy-codec and platform variation while still verifying substantially dark and light rows.
+- Updated README.md to remove references to the retired `--use-codec-fix` flag.
+
+### Removed
+
+- **Breaking:** the `--use-codec-fix` CLI flag. Codec selection is automatic and no longer configurable from the command line.
+- **Breaking:** the `use_codec_fix` parameter from `apply_duotone` and `apply_halftone`. Callers using either function directly must drop the argument.
+- `pytest` and `setuptools` from `requirements.txt`; both moved to `requirements-dev.txt`.
+
+---
+
 ## [0.3.0] - 2026-07-02
 
 ### Added

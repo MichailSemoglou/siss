@@ -11,6 +11,7 @@ named two-color palettes.
 ![Python version](https://img.shields.io/badge/python-3.7%2B-blue)
 ![PyPI version](https://img.shields.io/pypi/v/siss)
 ![PyPI downloads](https://img.shields.io/pypi/dm/siss)
+[![PyPI Downloads](https://static.pepy.tech/personalized-badge/siss?period=total&units=INTERNATIONAL_SYSTEM&left_color=GREY&right_color=BLUE&left_text=downloads)](https://pepy.tech/projects/siss)
 ![GitHub issues](https://img.shields.io/github/issues/MichailSemoglou/siss)
 ![GitHub last commit](https://img.shields.io/github/last-commit/MichailSemoglou/siss)
 
@@ -129,13 +130,7 @@ siss input_video.mp4 output_halftone.mp4 --effect halftone --symbol_type dot --g
 
 ### Codec Compatibility
 
-If you encounter codec errors, add `--use-codec-fix`:
-
-```bash
-siss input_video.mp4 output_video.mp4 --effect duotone --use-codec-fix
-```
-
-`--use-codec-fix` probes `cv2.VideoWriter_fourcc` candidates at startup and selects the first codec that opens successfully for the output container.
+Codec selection is **automatic** — the tool probes available `cv2.VideoWriter_fourcc` candidates at runtime based on your OS and output container, falling back through a priority list until a working codec is found. No extra flags are needed.
 
 ### Available Options
 
@@ -147,7 +142,6 @@ siss input_video.mp4 output_video.mp4 --effect duotone --use-codec-fix
 - `--symbol_size` – symbol size for halftone (default: `10`)
 - `--symbol_type` – halftone symbol shape: `plus`, `asterisk`, `slash`, or `dot` (default: `plus`)
 - `--grid_type` – halftone sampling grid: `square` or `hex` (default: `square`); `hex` staggers alternating rows by half a step for a traditional print-halftone dot screen
-- `--use-codec-fix` – enable adaptive codec selection
 
 ## Examples
 
@@ -199,9 +193,8 @@ siss input.mov output.mov --effect duotone --color1 0 0 255 --color2 255 255 0
 
 If you encounter video output errors:
 
-1. Add `--use-codec-fix` to enable adaptive codec selection.
-2. Verify that the required codecs are installed for your operating system.
-3. On Windows, try AVI output if MP4 encoding fails.
+1. Verify that the required codecs are installed for your operating system.
+2. On Windows, try AVI output if MP4 encoding fails.
 
 ### Memory Usage
 

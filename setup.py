@@ -1,12 +1,16 @@
 from setuptools import setup, find_packages
 from pathlib import Path
+import re
+
+# Single source of truth: read version from src/__init__.py
+_init = (Path(__file__).parent / "src" / "__init__.py").read_text()
+__version__ = re.search(r"__version__\s*=\s*['\"]([^'\"]+)['\"]", _init).group(1)
 
 # Try to read the long description from description.md
 try:
     this_directory = Path(__file__).parent
     long_description = (this_directory / "description.md").read_text()
 except Exception:
-    # Fallback description if file is not found
     long_description = """
 # Siss
 
@@ -32,7 +36,7 @@ For complete documentation, visit the [GitHub repository](https://github.com/Mic
 
 setup(
     name="siss",
-    version="0.3.0",
+    version=__version__,
     description="A command-line utility for applying artistic effects to videos",
     long_description=long_description,
     long_description_content_type="text/markdown",

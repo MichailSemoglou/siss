@@ -39,7 +39,6 @@ def _ns(**kwargs):
         symbol_size=10,
         symbol_type="plus",
         grid_type="square",
-        use_codec_fix=False,
     )
     base.update(kwargs)
     return Namespace(**base)
