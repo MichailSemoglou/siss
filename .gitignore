@@ -200,3 +200,12 @@ Thumbs.db
 
 # VS Code Copilot instruction files (local development only)
 .github/instructions/
+
+# Kimi Code CLI local instructions
+.kimi/instructions.md
+
+# Project agent instructions (local development only)
+/AGENTS.md
+
+# Local roadmap
+/ROADMAP.md

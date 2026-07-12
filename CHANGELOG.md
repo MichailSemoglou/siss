@@ -5,6 +5,12 @@ All notable changes to the Siss project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-07-12
+
+### Added
+
+- Still-image input and output. Passing an image extension (`.png`, `.jpg`, `.jpeg`, `.bmp`, `.tiff`, `.tif`, `.webp`) as the output path dispatches to `cv2.imread`/`cv2.imwrite` and reuses the existing per-frame duotone and halftone closures. Added `apply_duotone_image` and `apply_halftone_image` alongside their video counterparts, plus `process_image` and `is_image_file` helpers in `src/utils/video_processing.py`.
+
 ## [0.4.0] - 2026-07-10
 
 ### Added

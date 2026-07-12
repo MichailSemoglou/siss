@@ -1,25 +1,18 @@
 """
-Module for applying duotone color effects to videos.
+Module for applying duotone color effects to videos and still images.
 """
 import cv2
 import numpy as np
 
-from utils.video_processing import process_video_frames
+from utils.video_processing import process_image, process_video_frames
 
 
-def apply_duotone(video_path, output_path, color1_rgb, color2_rgb):
+def _make_duotone_processor(color1_rgb, color2_rgb):
     """
-    Apply duotone color effect to a video.
+    Build and return the per-frame closure used by both video and image paths.
 
-    Args:
-        video_path (str): Path to the input video file
-        output_path (str): Path where the processed video will be saved
-        color1_rgb (tuple): RGB color for dark areas (r, g, b), values 0-255
-        color2_rgb (tuple): RGB color for light areas (r, g, b), values 0-255
-
-    Raises:
-        FileNotFoundError: If the input video cannot be opened
-        ValueError: If the colors are not valid RGB values
+    Validates the input colors and returns a callable that maps a BGR frame
+    to a duotone BGR frame using the two RGB colors.
     """
     for color in [color1_rgb, color2_rgb]:
         if not all(0 <= c <= 255 for c in color):
@@ -37,4 +30,42 @@ def apply_duotone(video_path, output_path, color1_rgb, color2_rgb):
             duotone[:, :, i] = (1 - normalized) * color1[i] + normalized * color2[i]
         return duotone.astype(np.uint8)
 
-    process_video_frames(video_path, output_path, _duotone_frame)
+    return _duotone_frame
+
+
+def apply_duotone(video_path, output_path, color1_rgb, color2_rgb):
+    """
+    Apply duotone color effect to a video.
+
+    Args:
+        video_path (str): Path to the input video file
+        output_path (str): Path where the processed video will be saved
+        color1_rgb (tuple): RGB color for dark areas (r, g, b), values 0-255
+        color2_rgb (tuple): RGB color for light areas (r, g, b), values 0-255
+
+    Raises:
+        FileNotFoundError: If the input video cannot be opened
+        ValueError: If the colors are not valid RGB values
+    """
+    process_video_frames(
+        video_path, output_path, _make_duotone_processor(color1_rgb, color2_rgb)
+    )
+
+
+def apply_duotone_image(image_path, output_path, color1_rgb, color2_rgb):
+    """
+    Apply duotone color effect to a still image.
+
+    Args:
+        image_path (str): Path to the input image file
+        output_path (str): Path where the processed image will be saved
+        color1_rgb (tuple): RGB color for dark areas (r, g, b), values 0-255
+        color2_rgb (tuple): RGB color for light areas (r, g, b), values 0-255
+
+    Raises:
+        FileNotFoundError: If the input image cannot be opened
+        ValueError: If the colors are not valid RGB values
+    """
+    process_image(
+        image_path, output_path, _make_duotone_processor(color1_rgb, color2_rgb)
+    )

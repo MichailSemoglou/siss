@@ -6,7 +6,7 @@ import os
 import tempfile
 import numpy as np
 import cv2
-from duotone import apply_duotone
+from duotone import apply_duotone, apply_duotone_image
 
 
 class TestDuotone(unittest.TestCase):
@@ -84,6 +84,50 @@ class TestDuotone(unittest.TestCase):
         
         with self.assertRaises(ValueError):
             apply_duotone(self.input_path, self.output_path, (255, 0, 0), (-10, 255, 255))
+
+
+class TestDuotoneImage(unittest.TestCase):
+    """Tests for the still-image duotone path."""
+
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.input_path = os.path.join(self.temp_dir.name, "test_input.png")
+        self.output_path = os.path.join(self.temp_dir.name, "test_output.png")
+
+        # Create a simple gradient image
+        height, width = 240, 320
+        image = np.zeros((height, width, 3), dtype=np.uint8)
+        for y in range(height):
+            value = int(y * 255 / height)
+            image[y, :] = [value, value, value]
+        cv2.imwrite(self.input_path, image)
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    def test_apply_duotone_image_basic(self):
+        """Test basic duotone effect on a still image."""
+        color1 = (255, 0, 0)  # Red
+        color2 = (0, 255, 255)  # Cyan
+
+        apply_duotone_image(self.input_path, self.output_path, color1, color2)
+
+        self.assertTrue(os.path.exists(self.output_path))
+
+        output_image = cv2.imread(self.output_path)
+        self.assertIsNotNone(output_image)
+        self.assertEqual(output_image.shape[1], 320)  # Width
+        self.assertEqual(output_image.shape[0], 240)  # Height
+
+    def test_invalid_image_input_raises(self):
+        """Test error handling for a missing input image."""
+        with self.assertRaises(FileNotFoundError):
+            apply_duotone_image("nonexistent.png", self.output_path, (255, 0, 0), (0, 255, 255))
+
+    def test_invalid_image_colors_raise(self):
+        """Test error handling for invalid colors on the image path."""
+        with self.assertRaises(ValueError):
+            apply_duotone_image(self.input_path, self.output_path, (300, 0, 0), (0, 255, 255))
 
 
 if __name__ == "__main__":

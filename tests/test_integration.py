@@ -229,6 +229,67 @@ class TestIntegrationHalftone(unittest.TestCase):
             cap.release()
 
 
+class TestIntegrationStillImages(unittest.TestCase):
+    """End-to-end tests for still-image input and output."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.input_path = os.path.join(self.tmp.name, "input.png")
+        self.output_path = os.path.join(self.tmp.name, "output.png")
+
+        image = np.zeros((120, 160, 3), dtype=np.uint8)
+        for y in range(120):
+            value = int(y * 255 / 120)
+            image[y, :] = [value, value, value]
+        cv2.imwrite(self.input_path, image)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_duotone_image_pipeline_produces_png(self):
+        with mock.patch(
+            "sys.argv",
+            [
+                "siss",
+                self.input_path,
+                self.output_path,
+                "--effect",
+                "duotone",
+                "--color1",
+                "#000000",
+                "--color2",
+                "#ffffff",
+            ],
+        ):
+            rc = main()
+        self.assertEqual(rc, 0)
+        self.assertTrue(os.path.exists(self.output_path))
+        output = cv2.imread(self.output_path)
+        self.assertIsNotNone(output)
+        self.assertEqual(output.shape, (120, 160, 3))
+        # Top row (dark) should be near black; bottom row near white.
+        top_pixel = output[0, 80, :]
+        self.assertLessEqual(top_pixel[0], 40)
+        self.assertLessEqual(top_pixel[1], 40)
+        self.assertLessEqual(top_pixel[2], 40)
+        bottom_pixel = output[119, 80, :]
+        self.assertGreaterEqual(bottom_pixel[0], 215)
+        self.assertGreaterEqual(bottom_pixel[1], 215)
+        self.assertGreaterEqual(bottom_pixel[2], 215)
+
+    def test_halftone_image_pipeline_produces_png(self):
+        with mock.patch(
+            "sys.argv",
+            ["siss", self.input_path, self.output_path, "--effect", "halftone"],
+        ):
+            rc = main()
+        self.assertEqual(rc, 0)
+        self.assertTrue(os.path.exists(self.output_path))
+        output = cv2.imread(self.output_path)
+        self.assertIsNotNone(output)
+        self.assertEqual(output.shape, (120, 160, 3))
+
+
 class TestIntegrationErrorPaths(unittest.TestCase):
     """End-to-end tests for CLI error handling."""
 

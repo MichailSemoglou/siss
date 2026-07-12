@@ -6,7 +6,7 @@ import os
 import tempfile
 import numpy as np
 import cv2
-from halftone import apply_halftone
+from halftone import apply_halftone, apply_halftone_image
 
 
 class TestHalftone(unittest.TestCase):
@@ -142,6 +142,56 @@ class TestHalftone(unittest.TestCase):
         # Test with invalid symbol size
         with self.assertRaises(ValueError):
             apply_halftone(self.input_path, self.output_path, 0, (0, 0, 0), (255, 255, 255))
+
+
+class TestHalftoneImage(unittest.TestCase):
+    """Tests for the still-image halftone path."""
+
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.input_path = os.path.join(self.temp_dir.name, "test_input.png")
+        self.output_path = os.path.join(self.temp_dir.name, "test_output.png")
+
+        # Create a simple gradient image
+        height, width = 240, 320
+        image = np.zeros((height, width, 3), dtype=np.uint8)
+        for y in range(height):
+            value = int(y * 255 / height)
+            image[y, :] = [value, value, value]
+        cv2.imwrite(self.input_path, image)
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    def test_apply_halftone_image_basic(self):
+        """Test basic halftone effect on a still image."""
+        color1 = (0, 0, 0)  # Black
+        color2 = (255, 255, 255)  # White
+        symbol_size = 8
+
+        apply_halftone_image(self.input_path, self.output_path, symbol_size, color1, color2)
+
+        self.assertTrue(os.path.exists(self.output_path))
+
+        output_image = cv2.imread(self.output_path)
+        self.assertIsNotNone(output_image)
+        self.assertEqual(output_image.shape[1], 320)  # Width
+        self.assertEqual(output_image.shape[0], 240)  # Height
+
+    def test_invalid_image_input_raises(self):
+        """Test error handling for a missing input image."""
+        with self.assertRaises(FileNotFoundError):
+            apply_halftone_image("nonexistent.png", self.output_path, 10, (0, 0, 0), (255, 255, 255))
+
+    def test_invalid_image_colors_raise(self):
+        """Test error handling for invalid colors on the image path."""
+        with self.assertRaises(ValueError):
+            apply_halftone_image(self.input_path, self.output_path, 10, (300, 0, 0), (255, 255, 255))
+
+    def test_invalid_image_symbol_type_raises(self):
+        """Test error handling for invalid symbol type on the image path."""
+        with self.assertRaises(ValueError):
+            apply_halftone_image(self.input_path, self.output_path, 10, (0, 0, 0), (255, 255, 255), symbol_type='invalid_type')
 
 
 if __name__ == "__main__":

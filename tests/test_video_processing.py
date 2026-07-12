@@ -21,7 +21,9 @@ import numpy as np
 from utils.video_processing import (
     extract_frames,
     get_video_properties,
+    is_image_file,
     load_video,
+    process_image,
     process_video_frames,
     save_video,
 )
@@ -46,6 +48,73 @@ def _make_test_video(path, width=160, height=120, frames=5, fps=30.0):
     for _ in range(frames):
         writer.write(np.zeros((height, width, 3), dtype=np.uint8))
     writer.release()
+
+
+# ---------------------------------------------------------------------------
+# is_image_file
+# ---------------------------------------------------------------------------
+
+class TestIsImageFile(unittest.TestCase):
+    """is_image_file() detects still-image extensions."""
+
+    def test_png_is_image(self):
+        self.assertTrue(is_image_file("photo.png"))
+
+    def test_uppercase_png_is_image(self):
+        self.assertTrue(is_image_file("photo.PNG"))
+
+    def test_mp4_is_not_image(self):
+        self.assertFalse(is_image_file("clip.mp4"))
+
+    def test_no_extension_is_not_image(self):
+        self.assertFalse(is_image_file("clip"))
+
+
+# ---------------------------------------------------------------------------
+# process_image
+# ---------------------------------------------------------------------------
+
+class TestProcessImage(unittest.TestCase):
+    """process_image() applies a function to a still image."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.in_path = os.path.join(self.tmp.name, "in.png")
+        self.out_path = os.path.join(self.tmp.name, "out.png")
+        image = np.zeros((120, 160, 3), dtype=np.uint8)
+        cv2.imwrite(self.in_path, image)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_identity_function_produces_output_image(self):
+        process_image(self.in_path, self.out_path, lambda f: f)
+        self.assertTrue(os.path.exists(self.out_path))
+        output = cv2.imread(self.out_path)
+        self.assertIsNotNone(output)
+        self.assertEqual(output.shape, (120, 160, 3))
+
+    def test_nonexistent_input_raises_file_not_found(self):
+        missing = os.path.join(self.tmp.name, "never_created.png")
+        with self.assertRaises(FileNotFoundError):
+            process_image(missing, self.out_path, lambda f: f)
+
+    def test_kwargs_are_forwarded_to_function(self):
+        received = {}
+
+        def capture_kwargs(frame, **kw):
+            received.update(kw)
+            return frame
+
+        process_image(self.in_path, self.out_path, capture_kwargs, alpha=0.5, tag="test")
+        self.assertEqual(received.get("alpha"), 0.5)
+        self.assertEqual(received.get("tag"), "test")
+
+    def test_unwritable_output_raises_runtime_error(self):
+        """A missing output directory causes cv2.imwrite to fail."""
+        bad_path = os.path.join(self.tmp.name, "missing_dir", "out.png")
+        with self.assertRaises(RuntimeError):
+            process_image(self.in_path, bad_path, lambda f: f)
 
 
 # ---------------------------------------------------------------------------

@@ -1,32 +1,19 @@
 """
-Module for applying halftone pattern effects to videos.
+Module for applying halftone pattern effects to videos and still images.
 """
 import cv2
 import numpy as np
 
-from utils.video_processing import process_video_frames
+from utils.video_processing import process_image, process_video_frames
 
 
-def apply_halftone(video_path, output_path, symbol_size, color1_rgb, color2_rgb,
-                  symbol_type='plus', grid_type='square'):
+def _make_halftone_processor(symbol_size, color1_rgb, color2_rgb,
+                            symbol_type='plus', grid_type='square'):
     """
-    Apply halftone pattern effect to a video.
+    Build and return the per-frame closure used by both video and image paths.
 
-    Args:
-        video_path (str): Path to the input video file
-        output_path (str): Path where the processed video will be saved
-        symbol_size (int): Size of the largest symbol in the halftone effect
-        color1_rgb (tuple): RGB color for symbols (r, g, b), values 0-255
-        color2_rgb (tuple): RGB color for background (r, g, b), values 0-255
-        symbol_type (str): Type of symbol to use ('plus', 'asterisk', 'slash', or 'dot')
-        grid_type (str): Sampling grid layout ('square' or 'hex'). 'hex' offsets
-            every other row by half a step, producing the staggered dot
-            screen used in traditional print halftone reproduction.
-
-    Raises:
-        FileNotFoundError: If the input video cannot be opened
-        ValueError: If the colors are not valid RGB values, or if symbol_type
-            or grid_type is not one of the supported values
+    Validates the input parameters and returns a callable that maps a BGR frame
+    to a halftone BGR frame using the two RGB colors.
     """
     if not all(0 <= c <= 255 for c in color1_rgb + color2_rgb):
         raise ValueError("RGB color values must be between 0 and 255")
@@ -77,7 +64,67 @@ def apply_halftone(video_path, output_path, symbol_size, color1_rgb, color2_rgb,
         halftone_colored[symbol_mask] = symbol_color
         return halftone_colored
 
-    process_video_frames(video_path, output_path, _halftone_frame)
+    return _halftone_frame
+
+
+def apply_halftone(video_path, output_path, symbol_size, color1_rgb, color2_rgb,
+                  symbol_type='plus', grid_type='square'):
+    """
+    Apply halftone pattern effect to a video.
+
+    Args:
+        video_path (str): Path to the input video file
+        output_path (str): Path where the processed video will be saved
+        symbol_size (int): Size of the largest symbol in the halftone effect
+        color1_rgb (tuple): RGB color for symbols (r, g, b), values 0-255
+        color2_rgb (tuple): RGB color for background (r, g, b), values 0-255
+        symbol_type (str): Type of symbol to use ('plus', 'asterisk', 'slash', or 'dot')
+        grid_type (str): Sampling grid layout ('square' or 'hex'). 'hex' offsets
+            every other row by half a step, producing the staggered dot
+            screen used in traditional print halftone reproduction.
+
+    Raises:
+        FileNotFoundError: If the input video cannot be opened
+        ValueError: If the colors are not valid RGB values, or if symbol_type
+            or grid_type is not one of the supported values
+    """
+    process_video_frames(
+        video_path,
+        output_path,
+        _make_halftone_processor(
+            symbol_size, color1_rgb, color2_rgb, symbol_type=symbol_type, grid_type=grid_type
+        ),
+    )
+
+
+def apply_halftone_image(image_path, output_path, symbol_size, color1_rgb, color2_rgb,
+                        symbol_type='plus', grid_type='square'):
+    """
+    Apply halftone pattern effect to a still image.
+
+    Args:
+        image_path (str): Path to the input image file
+        output_path (str): Path where the processed image will be saved
+        symbol_size (int): Size of the largest symbol in the halftone effect
+        color1_rgb (tuple): RGB color for symbols (r, g, b), values 0-255
+        color2_rgb (tuple): RGB color for background (r, g, b), values 0-255
+        symbol_type (str): Type of symbol to use ('plus', 'asterisk', 'slash', or 'dot')
+        grid_type (str): Sampling grid layout ('square' or 'hex'). 'hex' offsets
+            every other row by half a step, producing the staggered dot
+            screen used in traditional print halftone reproduction.
+
+    Raises:
+        FileNotFoundError: If the input image cannot be opened
+        ValueError: If the colors are not valid RGB values, or if symbol_type
+            or grid_type is not one of the supported values
+    """
+    process_image(
+        image_path,
+        output_path,
+        _make_halftone_processor(
+            symbol_size, color1_rgb, color2_rgb, symbol_type=symbol_type, grid_type=grid_type
+        ),
+    )
 
 
 def _draw_plus_symbol(halftone, center_x, center_y, size):

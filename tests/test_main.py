@@ -23,7 +23,13 @@ _src_dir = os.path.abspath(_src_dir)
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
-from main import resolve_color_arg, _resolve_colors, main, validate_file_path  # noqa: E402
+from main import (  # noqa: E402
+    resolve_color_arg,
+    _resolve_colors,
+    main,
+    validate_file_path,
+    is_image_file,
+)
 
 
 def _ns(**kwargs):
@@ -280,6 +286,80 @@ class TestMainVideoEffects(unittest.TestCase):
             ):
                 rc = main()
         self.assertEqual(rc, 1)
+
+
+class TestMainImageEffects(unittest.TestCase):
+    """Tests for the still-image rendering paths inside main()."""
+
+    def setUp(self):
+        import tempfile
+
+        self.tmp = tempfile.TemporaryDirectory()
+        self.input_path = os.path.join(self.tmp.name, "input.png")
+        self.output_path = os.path.join(self.tmp.name, "output.png")
+
+        # A placeholder file is enough: apply_duotone_image/apply_halftone_image
+        # are fully mocked, so main() only needs the path to pass os.path.isfile().
+        open(self.input_path, "wb").close()
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_duotone_image_extension_dispatches_to_image_path(self):
+        with mock.patch("main.apply_duotone_image") as mock_dt_img:
+            with mock.patch("main.apply_duotone") as mock_dt_vid:
+                with mock.patch(
+                    "sys.argv",
+                    ["siss", self.input_path, self.output_path, "--effect", "duotone"],
+                ):
+                    rc = main()
+        self.assertEqual(rc, 0)
+        mock_dt_img.assert_called_once()
+        mock_dt_vid.assert_not_called()
+
+    def test_halftone_image_extension_dispatches_to_image_path(self):
+        with mock.patch("main.apply_halftone_image") as mock_ht_img:
+            with mock.patch("main.apply_halftone") as mock_ht_vid:
+                with mock.patch(
+                    "sys.argv",
+                    [
+                        "siss",
+                        self.input_path,
+                        self.output_path,
+                        "--effect",
+                        "halftone",
+                    ],
+                ):
+                    rc = main()
+        self.assertEqual(rc, 0)
+        mock_ht_img.assert_called_once()
+        mock_ht_vid.assert_not_called()
+
+    def test_duotone_video_extension_uses_video_path(self):
+        output_path = os.path.join(self.tmp.name, "output.mp4")
+        with mock.patch("main.apply_duotone_image") as mock_dt_img:
+            with mock.patch("main.apply_duotone") as mock_dt_vid:
+                with mock.patch(
+                    "sys.argv",
+                    ["siss", self.input_path, output_path, "--effect", "duotone"],
+                ):
+                    rc = main()
+        self.assertEqual(rc, 0)
+        mock_dt_img.assert_not_called()
+        mock_dt_vid.assert_called_once()
+
+
+class TestIsImageFile(unittest.TestCase):
+    """Tests for the image-extension detector imported into main."""
+
+    def test_png_is_image(self):
+        self.assertTrue(is_image_file("frame.png"))
+
+    def test_jpeg_is_image(self):
+        self.assertTrue(is_image_file("frame.JPEG"))
+
+    def test_mp4_is_not_image(self):
+        self.assertFalse(is_image_file("clip.mp4"))
 
 
 if __name__ == "__main__":

@@ -1,11 +1,11 @@
 # Siss
 
-A command-line tool for applying duotone and halftone effects to video files.
-Duotone maps per-pixel luminance to a linear blend between two user-supplied
-RGB colors; halftone renders plus, asterisk, slash, or dot symbols at
-luminance-proportional sizes over a 3×3-pixel sampled grid, on a square or
-hex-offset screen. Accepts hex strings, CSS named colors, RGB triples, and
-named two-color palettes.
+A command-line tool for applying duotone and halftone effects to video and
+still-image files. Duotone maps per-pixel luminance to a linear blend between
+two user-supplied RGB colors; halftone renders plus, asterisk, slash, or dot
+symbols at luminance-proportional sizes over a 3×3-pixel sampled grid, on a
+square or hex-offset screen. Accepts hex strings, CSS named colors, RGB triples,
+and named two-color palettes.
 
 ![GitHub license](https://img.shields.io/github/license/MichailSemoglou/siss)
 ![Python version](https://img.shields.io/badge/python-3.7%2B-blue)
@@ -21,7 +21,7 @@ named two-color palettes.
 - **Halftone** – renders plus, asterisk, slash, or dot symbols at sizes proportional to local luminance (3×3-pixel sampled average), with independent symbol and background colors, over a square or hex-offset sampling grid
 - **Color input** – accepts 3- and 6-digit hex strings (with or without `#`), case-insensitive CSS named colors, RGB integer triples, and named two-color palettes via `--palette`
 - **Codec selection** – probes `cv2.VideoWriter_fourcc` candidates per output format and OS at runtime; falls back through a priority list until a working codec is found
-- **Output formats** – writes MP4, MOV, AVI, MKV, and WMV; the container is inferred from the output file extension
+- **Output formats** – writes MP4, MOV, AVI, MKV, and WMV videos, plus PNG, JPEG, BMP, TIFF, and WebP still images; the format is inferred from the output file extension
 
 ## Installation
 
@@ -66,7 +66,7 @@ For a source checkout without installing:
 python3 src/main.py input_video.mp4 output_video.mp4 --effect duotone
 ```
 
-The output format is determined by the file extension of the output path. Supported containers: MP4, MOV, AVI, MKV, WMV.
+The output format is determined by the file extension of the output path. Supported video containers: MP4, MOV, AVI, MKV, WMV. Supported still-image formats: PNG, JPEG, BMP, TIFF, WebP.
 
 ### Specifying Colors
 
@@ -128,9 +128,19 @@ For the classic print-halftone look, use `dot` symbols on a `hex` grid, which st
 siss input_video.mp4 output_halftone.mp4 --effect halftone --symbol_type dot --grid_type hex --color1 0 0 0 --color2 255 255 255
 ```
 
+### Still Images
+
+This mode accepts still-image input and output paths only; it does not extract a frame from a video file:
+
+```bash
+siss input.jpg output.png --effect duotone --palette sunset
+```
+
+The input and output formats do not need to match; `siss` reads and writes through OpenCV's `cv2.imread`/`cv2.imwrite` for image paths.
+
 ### Codec Compatibility
 
-Codec selection is **automatic** — the tool probes available `cv2.VideoWriter_fourcc` candidates at runtime based on your OS and output container, falling back through a priority list until a working codec is found. No extra flags are needed.
+Codec selection for video output is **automatic** — the tool probes available `cv2.VideoWriter_fourcc` candidates at runtime based on your OS and output container, falling back through a priority list until a working codec is found. No extra flags are needed.
 
 ### Available Options
 

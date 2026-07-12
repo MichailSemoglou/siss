@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Video effects CLI tool for applying duotone and halftone effects to videos.
+CLI tool for applying duotone and halftone effects to videos and still images.
 
 Colors can be supplied in any of these designer-friendly forms:
 
@@ -9,15 +9,19 @@ Colors can be supplied in any of these designer-friendly forms:
 * RGB triple:  ``--color1 255 0 0``    (the original syntax)
 
 Or pick a whole look at once with ``--palette <name>`` (see ``--list-palettes``).
+
+Output format is chosen from the output path extension: ``.mp4``/``.mov`` write
+a video, while ``.png``/``.jpg``/``.webp`` write a single still image.
 """
 import argparse
 import sys
 import os
 from typing import List, Optional, Tuple
 
-from duotone import apply_duotone
-from halftone import apply_halftone
+from duotone import apply_duotone, apply_duotone_image
+from halftone import apply_halftone, apply_halftone_image
 from colors import parse_color, get_palette, list_palettes
+from utils.video_processing import is_image_file
 
 
 def validate_file_path(file_path, check_exists=True):
@@ -74,9 +78,10 @@ def parse_arguments():
     """
     parser = argparse.ArgumentParser(
         description=(
-            "Apply duotone and halftone effects to a video. "
+            "Apply duotone and halftone effects to a video or still image. "
             "Colors accept hex (#ff0044), CSS names (rebeccapurple), "
-            "RGB triples (255 0 0), or a named --palette."
+            "RGB triples (255 0 0), or a named --palette. "
+            "Output format is chosen from the output path extension."
         ),
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
@@ -85,13 +90,13 @@ def parse_arguments():
     parser.add_argument(
         "input",
         nargs="?",
-        help="Path to the input video",
+        help="Path to the input video or still image",
     )
 
     parser.add_argument(
         "output",
         nargs="?",
-        help="Path to save the output video",
+        help="Path to save the output video or still image",
     )
 
     parser.add_argument(
@@ -238,24 +243,44 @@ def main():
         # Resolve colors (palette + explicit overrides).
         color1_rgb, color2_rgb = _resolve_colors(args)
 
-        # Apply selected effect
+        # Apply selected effect, dispatching to video or image path by the
+        # output file extension.
         if args.effect == "duotone":
-            apply_duotone(
-                input_path,
-                args.output,
-                color1_rgb,
-                color2_rgb,
-            )
+            if is_image_file(args.output):
+                apply_duotone_image(
+                    input_path,
+                    args.output,
+                    color1_rgb,
+                    color2_rgb,
+                )
+            else:
+                apply_duotone(
+                    input_path,
+                    args.output,
+                    color1_rgb,
+                    color2_rgb,
+                )
         elif args.effect == "halftone":
-            apply_halftone(
-                input_path,
-                args.output,
-                args.symbol_size,
-                color1_rgb,
-                color2_rgb,
-                symbol_type=args.symbol_type,
-                grid_type=args.grid_type,
-            )
+            if is_image_file(args.output):
+                apply_halftone_image(
+                    input_path,
+                    args.output,
+                    args.symbol_size,
+                    color1_rgb,
+                    color2_rgb,
+                    symbol_type=args.symbol_type,
+                    grid_type=args.grid_type,
+                )
+            else:
+                apply_halftone(
+                    input_path,
+                    args.output,
+                    args.symbol_size,
+                    color1_rgb,
+                    color2_rgb,
+                    symbol_type=args.symbol_type,
+                    grid_type=args.grid_type,
+                )
 
     except (FileNotFoundError, ValueError) as e:
         print(f"Error: {e}", file=sys.stderr)

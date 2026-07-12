@@ -115,6 +115,50 @@ def save_video(output_path, frames, fps, show_progress=True):
     print(f"Video saved to {output_path}")
 
 
+IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.webp'}
+
+
+def is_image_file(file_path):
+    """
+    Return True if *file_path* has a still-image extension.
+
+    The check is case-insensitive and covers the formats OpenCV's
+    ``cv2.imread``/``cv2.imwrite`` commonly handle.
+    """
+    return os.path.splitext(file_path)[1].lower() in IMAGE_EXTENSIONS
+
+
+def process_image(image_path, output_path, process_function, **kwargs):
+    """
+    Process a still image by applying a function to it.
+
+    Args:
+        image_path (str): Path to the input image
+        output_path (str): Path where the processed image will be saved
+        process_function (callable): Function to apply to the image
+            The function should take a frame and return a processed frame
+        **kwargs: Additional arguments to pass to the process_function
+
+    Raises:
+        FileNotFoundError: If the image file cannot be opened
+
+    Example:
+        def grayscale(frame):
+            return cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+        process_image('input.png', 'output.png', grayscale)
+    """
+    frame = cv2.imread(image_path)
+    if frame is None:
+        raise FileNotFoundError(f"Cannot open image file: {image_path}")
+
+    processed_frame = process_function(frame, **kwargs)
+    success = cv2.imwrite(output_path, processed_frame)
+    if not success:
+        raise RuntimeError(f"Failed to write image file: {output_path}")
+    print(f"Processed image saved to {output_path}")
+
+
 def process_video_frames(video_path, output_path, process_function, **kwargs):
     """
     Process a video by applying a function to each frame.
