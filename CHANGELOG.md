@@ -5,6 +5,21 @@ All notable changes to the Siss project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-07-20
+
+### Changed
+
+- Vectorized the halftone renderer. The per-cell Python loops over the sampling grid are replaced by NumPy operations: the luminance grid is computed once from an integral image, symbol sizes derive from it in bulk, and same-sized symbols are drawn with vectorized index operations. Diagonal strokes touching the right or bottom frame edge are still drawn per cell with OpenCV, preserving the clamped-endpoint rasterization of the previous renderer. Output is pixel-identical to 0.5.0; rendering a 1920x1080 frame at the default symbol size drops from about 197 ms to about 9 ms.
+
+### Added
+
+- Solid-frame regression tests for the halftone image path in `tests/test_halftone.py`: a white input renders background only, a black input renders maximum-size symbols, checked for every symbol type and grid type.
+
+### Fixed
+
+- `validate_codec` in `src/codec_fix.py` now releases the probe `VideoWriter` on every exit path; previously it leaked the writer when initialization failed or an exception occurred mid-test.
+- Removed an unused `subprocess` import from `src/codec_fix.py`.
+
 ## [0.5.0] - 2026-07-12
 
 ### Added

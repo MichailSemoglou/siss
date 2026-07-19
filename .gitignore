@@ -190,6 +190,34 @@ Thumbs.db
 *.avi
 *.AVI
 
+# Image files (output/test files)
+*.jpg
+*.JPG
+*.jpeg
+*.JPEG
+*.png
+*.PNG
+*.gif
+*.GIF
+*.bmp
+*.BMP
+*.tiff
+*.TIFF
+*.tif
+*.TIF
+*.webp
+*.WEBP
+*.heic
+*.HEIC
+*.heif
+*.HEIF
+*.ico
+*.ICO
+*.raw
+*.RAW
+*.psd
+*.PSD
+
 # IDE files
 .vscode/
 .idea/

@@ -30,33 +30,40 @@ def _make_halftone_processor(symbol_size, color1_rgb, color2_rgb,
     background_color = color2_rgb[::-1]
     symbol_color = color1_rgb[::-1]
 
-    symbol_functions = {
-        'plus': _draw_plus_symbol,
-        'asterisk': _draw_asterisk_symbol,
-        'slash': _draw_slash_symbol,
-        'dot': _draw_dot_symbol,
-    }
-    draw_symbol = symbol_functions[symbol_type]
-
     def _halftone_frame(frame):
         # Determine grid parameters from the actual frame size
         h, w = frame.shape[:2]
         adjusted = min(symbol_size, w // 20)
         step = max(adjusted // 2, 4)
+        half = step // 2
+        max_size = half - 1
 
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        halftone = np.ones_like(gray) * 255
+        halftone = np.full((h, w), 255, dtype=np.uint8)
 
-        for y in range(0, h, step):
-            row_offset = step // 2 if grid_type == 'hex' and (y // step) % 2 == 1 else 0
-            for x in range(row_offset, w, step):
-                if y < h and x < w:
-                    region = gray[y:min(y + 3, h), x:min(x + 3, w)]
-                    intensity = np.mean(region)
-                    max_size = step // 2 - 1
-                    size = int(max_size * (1 - intensity / 255))
-                    if size > 0 and y + step // 2 < h and x + step // 2 < w:
-                        draw_symbol(halftone, x + step // 2, y + step // 2, size)
+        # Mean luminance of the 3x3 region at every grid point, computed in
+        # one pass from the integral image instead of a per-cell Python loop.
+        integral = cv2.integral(gray, sdepth=cv2.CV_64F)
+
+        # On a hex grid, odd rows shift right by half a step.
+        ys = np.arange(0, h, step)
+        even_xs = np.arange(0, w, step)
+        odd_xs = np.arange(half, w, step) if grid_type == 'hex' else even_xs
+
+        for block_ys, block_xs in ((ys[0::2], even_xs), (ys[1::2], odd_xs)):
+            if block_ys.size == 0 or block_xs.size == 0:
+                continue
+
+            means = _grid_means(integral, block_ys, block_xs, h, w)
+            sizes = (max_size * (1.0 - means / 255.0)).astype(np.intp)
+
+            cx = block_xs + half
+            cy = block_ys + half
+            keep = (sizes > 0) & (cx < w) & (cy[:, np.newaxis] < h)
+            rows, cols = np.nonzero(keep)
+            if rows.size:
+                _draw_symbols(halftone, symbol_type, cx[cols], cy[rows],
+                              sizes[rows, cols])
 
         halftone_colored = np.zeros((h, w, 3), dtype=np.uint8)
         halftone_colored[:] = background_color
@@ -65,6 +72,100 @@ def _make_halftone_processor(symbol_size, color1_rgb, color2_rgb,
         return halftone_colored
 
     return _halftone_frame
+
+
+def _grid_means(integral, ys, xs, h, w, k=3):
+    """
+    Mean luminance of the k x k region anchored at each grid point.
+
+    Returns an array of shape (len(ys), len(xs)). Regions are clipped at the
+    right and bottom frame edges, matching the per-cell slicing of the former
+    loop-based renderer.
+    """
+    y2 = np.minimum(ys + k, h)
+    x2 = np.minimum(xs + k, w)
+    sums = (integral[np.ix_(y2, x2)] - integral[np.ix_(ys, x2)]
+            - integral[np.ix_(y2, xs)] + integral[np.ix_(ys, xs)])
+    counts = (y2 - ys)[:, np.newaxis] * (x2 - xs)
+    return sums / counts
+
+
+def _draw_symbols(halftone, symbol_type, cx, cy, sizes):
+    """
+    Draw a batch of symbols on the single-channel mask, grouped by size.
+
+    Each size group is drawn with vectorized index operations. The diagonal
+    strokes of asterisk and slash symbols in cells touching the right or
+    bottom edge are drawn per cell with OpenCV instead: the former renderer
+    clamps those line endpoints to the frame, and a clamped Bresenham line is
+    not pixel-identical to a clipped 45-degree diagonal.
+    """
+    h, w = halftone.shape
+    for size in np.unique(sizes):
+        sel = sizes == size
+        x = cx[sel]
+        y = cy[sel]
+        if symbol_type in ('asterisk', 'slash'):
+            edge = (x + size >= w) | (y + size >= h)
+            if edge.any():
+                draw_edge = _EDGE_DRAWERS[symbol_type]
+                for ex, ey in zip(x[edge], y[edge]):
+                    draw_edge(halftone, int(ex), int(ey), int(size))
+                x = x[~edge]
+                y = y[~edge]
+        _BULK_DRAWERS[symbol_type](halftone, x, y, int(size))
+
+
+def _scatter(halftone, rows, cols):
+    """Zero the in-bounds (row, col) positions of the symbol mask."""
+    h, w = halftone.shape
+    keep = (rows >= 0) & (rows < h) & (cols >= 0) & (cols < w)
+    halftone[rows[keep], cols[keep]] = 0
+
+
+def _draw_plus_bulk(halftone, x, y, size):
+    """Draw plus symbols of one size centered at each (x, y)."""
+    d = np.arange(-size, size + 1)
+    _scatter(halftone, np.repeat(y, d.size), (x[:, np.newaxis] + d).ravel())
+    _scatter(halftone, (y[:, np.newaxis] + d).ravel(), np.repeat(x, d.size))
+
+
+def _draw_asterisk_bulk(halftone, x, y, size):
+    """Draw asterisk symbols of one size centered at each (x, y)."""
+    _draw_plus_bulk(halftone, x, y, size)
+    d = np.arange(-size, size + 1)
+    cols = (x[:, np.newaxis] + d).ravel()
+    _scatter(halftone, (y[:, np.newaxis] + d).ravel(), cols)
+    _scatter(halftone, (y[:, np.newaxis] - d).ravel(), cols)
+
+
+def _draw_slash_bulk(halftone, x, y, size):
+    """Draw slash symbols of one size centered at each (x, y)."""
+    d = np.arange(-size, size + 1)
+    _scatter(halftone, (y[:, np.newaxis] - d).ravel(),
+             (x[:, np.newaxis] + d).ravel())
+
+
+def _draw_dot_bulk(halftone, x, y, size):
+    """
+    Draw filled dots of one size centered at each (x, y).
+
+    Offsets come from a stamp rasterized by cv2.circle, so the result matches
+    per-cell cv2.circle calls exactly.
+    """
+    stamp = np.zeros((2 * size + 1, 2 * size + 1), dtype=np.uint8)
+    cv2.circle(stamp, (size, size), size, 1, -1)
+    dy, dx = np.nonzero(stamp)
+    _scatter(halftone, (y[:, np.newaxis] + (dy - size)).ravel(),
+             (x[:, np.newaxis] + (dx - size)).ravel())
+
+
+_BULK_DRAWERS = {
+    'plus': _draw_plus_bulk,
+    'asterisk': _draw_asterisk_bulk,
+    'slash': _draw_slash_bulk,
+    'dot': _draw_dot_bulk,
+}
 
 
 def apply_halftone(video_path, output_path, symbol_size, color1_rgb, color2_rgb,
@@ -166,10 +267,7 @@ def _draw_slash_symbol(halftone, center_x, center_y, size):
     cv2.line(halftone, (x1, y1), (x2, y2), 0, 1)
 
 
-def _draw_dot_symbol(halftone, center_x, center_y, size):
-    """Draw a filled dot (circle) symbol on the halftone image.
-
-    This is the classic print-halftone symbol: a solid circle whose radius
-    scales with local luminance, in place of the plus/asterisk/slash glyphs.
-    """
-    cv2.circle(halftone, (center_x, center_y), size, 0, -1)
+_EDGE_DRAWERS = {
+    'asterisk': _draw_asterisk_symbol,
+    'slash': _draw_slash_symbol,
+}

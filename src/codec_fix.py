@@ -7,7 +7,6 @@ videos with OpenCV, particularly on different operating systems.
 import platform
 import cv2
 import numpy as np
-import subprocess
 import os
 import tempfile
 from pathlib import Path
@@ -78,22 +77,24 @@ def validate_codec(codec, width, height, fps=30.0):
         # Try to initialize a VideoWriter with the codec
         fourcc = cv2.VideoWriter_fourcc(*codec)
         writer = cv2.VideoWriter(temp_path, fourcc, fps, (width, height))
-        
-        # Check if writer was initialized successfully
-        if not writer.isOpened():
-            return False
-        
-        # Create a simple test frame
-        test_frame = np.zeros((height, width, 3), dtype=np.uint8)
-        
-        # Try to write the test frame
-        writer.write(test_frame)
-        writer.release()
-        
+
+        try:
+            # Check if writer was initialized successfully
+            if not writer.isOpened():
+                return False
+
+            # Create a simple test frame
+            test_frame = np.zeros((height, width, 3), dtype=np.uint8)
+
+            # Try to write the test frame
+            writer.write(test_frame)
+        finally:
+            writer.release()
+
         # Check if the file was created and has content
         if not os.path.exists(temp_path) or os.path.getsize(temp_path) == 0:
             return False
-            
+
         return True
     except Exception:
         return False

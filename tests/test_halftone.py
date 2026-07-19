@@ -178,6 +178,37 @@ class TestHalftoneImage(unittest.TestCase):
         self.assertEqual(output_image.shape[1], 320)  # Width
         self.assertEqual(output_image.shape[0], 240)  # Height
 
+    def test_solid_white_frame_renders_no_symbols(self):
+        """A fully white frame has zero luminance-driven sizes: background only."""
+        cv2.imwrite(self.input_path, np.full((120, 160, 3), 255, dtype=np.uint8))
+
+        for symbol_type in ('plus', 'asterisk', 'slash', 'dot'):
+            for grid_type in ('square', 'hex'):
+                apply_halftone_image(
+                    self.input_path, self.output_path, 10,
+                    (0, 0, 0), (255, 200, 100),
+                    symbol_type=symbol_type, grid_type=grid_type,
+                )
+                output = cv2.imread(self.output_path)
+                # Background color in BGR, as written by the renderer.
+                expected = np.full((120, 160, 3), (100, 200, 255), dtype=np.uint8)
+                np.testing.assert_array_equal(output, expected)
+
+    def test_solid_black_frame_renders_symbols(self):
+        """A fully black frame gives every cell the maximum symbol size."""
+        cv2.imwrite(self.input_path, np.zeros((120, 160, 3), dtype=np.uint8))
+
+        for symbol_type in ('plus', 'asterisk', 'slash', 'dot'):
+            for grid_type in ('square', 'hex'):
+                apply_halftone_image(
+                    self.input_path, self.output_path, 10,
+                    (0, 0, 0), (255, 255, 255),
+                    symbol_type=symbol_type, grid_type=grid_type,
+                )
+                output = cv2.imread(self.output_path)
+                # Symbol color in BGR must appear somewhere in the frame.
+                self.assertTrue(np.any(np.all(output == (0, 0, 0), axis=-1)))
+
     def test_invalid_image_input_raises(self):
         """Test error handling for a missing input image."""
         with self.assertRaises(FileNotFoundError):
