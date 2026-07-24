@@ -23,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking:** the unused helpers `extract_frames()`, `save_video()`, and `release_resources()` from `src/siss/utils/video_processing.py`. None had production callers; the first two were exercised only by their own tests, which are removed with them. Code importing these helpers must keep its own copies.
 - Unused imports: `numpy` from `src/siss/utils/video_processing.py` and `sys` from `tests/test_video_processing.py`.
 
+### Fixed
+
+- `validate_codec()` and `get_working_codec()` in `src/siss/codec_fix.py` now probe with the actual requested output extension (`.avi`, `.mov`, `.mkv`, `.wmv`) instead of a hardcoded `.mp4`, so codec validation reflects the real target container.
+- `validate_rgb()` in `src/siss/colors.py` now rejects non-integer and boolean channels, and raises `ValueError` (instead of a leaked `TypeError`) for non-iterable input.
+
 ## [0.5.1] - 2026-07-20
 
 ### Changed
