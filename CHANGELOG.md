@@ -5,6 +5,24 @@ All notable changes to the Siss project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-07-24
+
+### Changed
+
+- Restructured the source tree as a proper `siss` package. Modules moved from flat files under `src/` to `src/siss/`, internal imports are now relative, and `setup.py` installs `packages=["siss", "siss.utils"]` with the console-script entry point `siss=siss.main:main`. The generic top-level module names (`main`, `duotone`, `utils`, and others) are no longer installed, removing the risk of conflicts with other packages.
+- Tests now import the package as `siss.*`. The per-file `sys.path` manipulation in `tests/` is removed; `conftest.py` is the single place that puts `src/` on the path for a source checkout.
+- `MANIFEST.in` now includes `src/siss/__init__.py`, the file `setup.py` reads `__version__` from.
+- Unified the video and still-image processing paths. `process_media()` in `src/siss/utils/video_processing.py` dispatches on the output extension, `apply_duotone()` and `apply_halftone()` handle both media types through one entry point, and `main()` no longer repeats the dispatch per effect. `apply_duotone_image()` and `apply_halftone_image()` remain as aliases for backward compatibility.
+- RGB channel validation is shared through `validate_rgb()` in `src/siss/colors.py`; `parse_color` and both effect processors use it. Out-of-range colors still raise `ValueError`.
+- Codec selection in `src/siss/codec_fix.py` is now a single default map with per-OS overrides, and `get_working_codec` validates each candidate codec at most once per call. Selected codecs are unchanged.
+- `setup.py` reads the PyPI long description from `description.md` directly; the embedded fallback copy is removed.
+- Test scaffolding is shared through `tests/helpers.py` instead of per-file gradient video and image builders.
+
+### Removed
+
+- **Breaking:** the unused helpers `extract_frames()`, `save_video()`, and `release_resources()` from `src/siss/utils/video_processing.py`. None had production callers; the first two were exercised only by their own tests, which are removed with them. Code importing these helpers must keep its own copies.
+- Unused imports: `numpy` from `src/siss/utils/video_processing.py` and `sys` from `tests/test_video_processing.py`.
+
 ## [0.5.1] - 2026-07-20
 
 ### Changed

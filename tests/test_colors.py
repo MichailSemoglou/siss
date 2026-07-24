@@ -2,10 +2,11 @@
 Unit tests for the colors module (Proposal #2: palette & hex input).
 """
 import unittest
-from colors import (
+from siss.colors import (
     parse_color,
     get_palette,
     list_palettes,
+    validate_rgb,
     PALETTES,
     CSS_NAMED_COLORS,
 )
@@ -154,6 +155,46 @@ class TestPalettes(unittest.TestCase):
         catalog = list_palettes()
         for name in PALETTES.keys():
             self.assertIn(name, catalog)
+
+
+class TestValidateRgb(unittest.TestCase):
+    """Tests for the shared RGB validator."""
+
+    def test_valid_tuple_returned_as_is(self):
+        self.assertEqual(validate_rgb((255, 0, 68)), (255, 0, 68))
+
+    def test_valid_list_returned_as_tuple(self):
+        self.assertEqual(validate_rgb([10, 20, 30]), (10, 20, 30))
+
+    def test_wrong_length_raises_value_error(self):
+        with self.assertRaises(ValueError):
+            validate_rgb((1, 2))
+        with self.assertRaises(ValueError):
+            validate_rgb((1, 2, 3, 4))
+
+    def test_out_of_range_raises_value_error(self):
+        with self.assertRaises(ValueError):
+            validate_rgb((256, 0, 0))
+        with self.assertRaises(ValueError):
+            validate_rgb((-1, 0, 0))
+
+    def test_non_integer_channel_raises_value_error(self):
+        with self.assertRaises(ValueError):
+            validate_rgb((1.5, 2, 3))
+        with self.assertRaises(ValueError):
+            validate_rgb(("1", 2, 3))
+
+    def test_boolean_channel_raises_value_error(self):
+        with self.assertRaises(ValueError):
+            validate_rgb((True, 0, 0))
+        with self.assertRaises(ValueError):
+            validate_rgb((False, 0, 0))
+
+    def test_non_iterable_input_raises_value_error_not_type_error(self):
+        with self.assertRaises(ValueError):
+            validate_rgb(5)
+        with self.assertRaises(ValueError):
+            validate_rgb(None)
 
 
 if __name__ == "__main__":

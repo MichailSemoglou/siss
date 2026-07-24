@@ -4,7 +4,8 @@ Module for applying halftone pattern effects to videos and still images.
 import cv2
 import numpy as np
 
-from utils.video_processing import process_image, process_video_frames
+from .colors import validate_rgb
+from .utils.video_processing import process_media
 
 
 def _make_halftone_processor(symbol_size, color1_rgb, color2_rgb,
@@ -15,8 +16,8 @@ def _make_halftone_processor(symbol_size, color1_rgb, color2_rgb,
     Validates the input parameters and returns a callable that maps a BGR frame
     to a halftone BGR frame using the two RGB colors.
     """
-    if not all(0 <= c <= 255 for c in color1_rgb + color2_rgb):
-        raise ValueError("RGB color values must be between 0 and 255")
+    background_color = validate_rgb(color2_rgb)[::-1]
+    symbol_color = validate_rgb(color1_rgb)[::-1]
 
     if symbol_type not in ['plus', 'asterisk', 'slash', 'dot']:
         raise ValueError("Symbol type must be 'plus', 'asterisk', 'slash', or 'dot'")
@@ -26,9 +27,6 @@ def _make_halftone_processor(symbol_size, color1_rgb, color2_rgb,
 
     if symbol_size <= 0:
         raise ValueError("Symbol size must be greater than 0")
-
-    background_color = color2_rgb[::-1]
-    symbol_color = color1_rgb[::-1]
 
     def _halftone_frame(frame):
         # Determine grid parameters from the actual frame size
@@ -171,11 +169,15 @@ _BULK_DRAWERS = {
 def apply_halftone(video_path, output_path, symbol_size, color1_rgb, color2_rgb,
                   symbol_type='plus', grid_type='square'):
     """
-    Apply halftone pattern effect to a video.
+    Apply halftone pattern effect to a video or still image.
+
+    The processing path is chosen from the output path extension: image
+    extensions go through ``cv2.imread``/``cv2.imwrite``, anything else is
+    processed frame by frame as a video.
 
     Args:
-        video_path (str): Path to the input video file
-        output_path (str): Path where the processed video will be saved
+        video_path (str): Path to the input video or still image file
+        output_path (str): Path where the processed result will be saved
         symbol_size (int): Size of the largest symbol in the halftone effect
         color1_rgb (tuple): RGB color for symbols (r, g, b), values 0-255
         color2_rgb (tuple): RGB color for background (r, g, b), values 0-255
@@ -185,11 +187,11 @@ def apply_halftone(video_path, output_path, symbol_size, color1_rgb, color2_rgb,
             screen used in traditional print halftone reproduction.
 
     Raises:
-        FileNotFoundError: If the input video cannot be opened
+        FileNotFoundError: If the input cannot be opened
         ValueError: If the colors are not valid RGB values, or if symbol_type
             or grid_type is not one of the supported values
     """
-    process_video_frames(
+    process_media(
         video_path,
         output_path,
         _make_halftone_processor(
@@ -203,28 +205,12 @@ def apply_halftone_image(image_path, output_path, symbol_size, color1_rgb, color
     """
     Apply halftone pattern effect to a still image.
 
-    Args:
-        image_path (str): Path to the input image file
-        output_path (str): Path where the processed image will be saved
-        symbol_size (int): Size of the largest symbol in the halftone effect
-        color1_rgb (tuple): RGB color for symbols (r, g, b), values 0-255
-        color2_rgb (tuple): RGB color for background (r, g, b), values 0-255
-        symbol_type (str): Type of symbol to use ('plus', 'asterisk', 'slash', or 'dot')
-        grid_type (str): Sampling grid layout ('square' or 'hex'). 'hex' offsets
-            every other row by half a step, producing the staggered dot
-            screen used in traditional print halftone reproduction.
-
-    Raises:
-        FileNotFoundError: If the input image cannot be opened
-        ValueError: If the colors are not valid RGB values, or if symbol_type
-            or grid_type is not one of the supported values
+    Kept for backward compatibility: apply_halftone() handles still images
+    and videos through the same entry point, so this simply forwards to it.
     """
-    process_image(
-        image_path,
-        output_path,
-        _make_halftone_processor(
-            symbol_size, color1_rgb, color2_rgb, symbol_type=symbol_type, grid_type=grid_type
-        ),
+    apply_halftone(
+        image_path, output_path, symbol_size, color1_rgb, color2_rgb,
+        symbol_type=symbol_type, grid_type=grid_type,
     )
 
 

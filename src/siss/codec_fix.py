@@ -12,51 +12,43 @@ import tempfile
 from pathlib import Path
 
 
+# Default codec per extension, used on Linux and other platforms. Per-OS
+# overrides are merged on top of this base map.
+_DEFAULT_CODECS = {
+    '.avi': 'XVID',
+    '.mp4': 'mp4v',  # DIVX, X264 are also options
+    '.mov': 'mp4v',
+    '.mkv': 'X264',
+    '.wmv': 'WMV2',
+}
+
+_OS_CODEC_OVERRIDES = {
+    'Windows': {'.mp4': 'H264', '.mov': 'H264', '.mkv': 'H264'},  # DIVX also an option
+    'Darwin': {'.mp4': 'avc1', '.mov': 'avc1', '.mkv': 'avc1'},  # H.264 codec
+}
+
+
 def get_compatible_codec(output_path):
     """
     Get a compatible codec for the current operating system and output format.
-    
+
     Args:
         output_path (str): Path where the video will be saved
-        
+
     Returns:
         str: Four character codec code
     """
     ext = Path(output_path).suffix.lower()
-    
-    # Windows-friendly codecs
-    if platform.system() == "Windows":
-        codec_map = {
-            '.avi': 'XVID',
-            '.mp4': 'H264',  # DIVX is also an option
-            '.mov': 'H264',
-            '.mkv': 'H264',
-            '.wmv': 'WMV2',
-        }
-    # macOS-friendly codecs
-    elif platform.system() == "Darwin":
-        codec_map = {
-            '.avi': 'XVID',
-            '.mp4': 'avc1',  # H.264 codec
-            '.mov': 'avc1',  # H.264 codec
-            '.mkv': 'avc1',
-            '.wmv': 'WMV2',
-        }
-    # Linux and other platforms
-    else:
-        codec_map = {
-            '.avi': 'XVID',
-            '.mp4': 'mp4v',  # DIVX, X264 are also options
-            '.mov': 'mp4v',
-            '.mkv': 'X264',
-            '.wmv': 'WMV2',
-        }
-    
+    codec_map = {
+        **_DEFAULT_CODECS,
+        **_OS_CODEC_OVERRIDES.get(platform.system(), {}),
+    }
+
     # Default to a generally compatible codec if extension not found
     return codec_map.get(ext, 'mp4v')
 
 
-def validate_codec(codec, width, height, fps=30.0):
+def validate_codec(codec, width, height, fps=30.0, ext='.mp4'):
     """
     Test if the codec works on the current system.
     
@@ -65,12 +57,16 @@ def validate_codec(codec, width, height, fps=30.0):
         width (int): Width of test video
         height (int): Height of test video
         fps (float): Frame rate for test
+        ext (str): Output container extension (e.g. '.mp4', '.avi') used
+            for the temporary probe file, so the codec is validated
+            against the actual target container
         
     Returns:
         bool: True if codec works, False otherwise
     """
-    # Create a temporary file to test codec
-    with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as tmp:
+    # Create a temporary file to test codec, using the requested container
+    # extension so probing reflects the actual target format
+    with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
         temp_path = tmp.name
     
     try:
@@ -123,12 +119,7 @@ def get_working_codec(output_path, width, height, fps=30.0):
         RuntimeError: If no compatible codec is found
     """
     ext = Path(output_path).suffix.lower()
-    
-    # Try specific codec for the format first
-    primary_codec = get_compatible_codec(output_path)
-    if validate_codec(primary_codec, width, height, fps):
-        return primary_codec
-    
+
     # Fallback codec options by extension
     fallback_codecs = {
         '.mp4': ['mp4v', 'avc1', 'H264', 'DIVX', 'X264'],
@@ -137,16 +128,24 @@ def get_working_codec(output_path, width, height, fps=30.0):
         '.mkv': ['X264', 'mp4v'],
         '.wmv': ['WMV2', 'WMV1']
     }
-    
-    # Try fallback codecs
-    for codec in fallback_codecs.get(ext, ['mp4v', 'XVID', 'MJPG']):
-        if validate_codec(codec, width, height, fps):
+
+    # Candidates in priority order: the OS-specific primary codec first, then
+    # the extension's fallbacks, with MJPG as a last resort that works on
+    # almost all platforms. Each codec is validated at most once.
+    candidates = (
+        [get_compatible_codec(output_path)]
+        + fallback_codecs.get(ext, ['mp4v', 'XVID', 'MJPG'])
+        + ['MJPG']
+    )
+
+    tried = set()
+    for codec in candidates:
+        if codec in tried:
+            continue
+        tried.add(codec)
+        if validate_codec(codec, width, height, fps, ext=ext):
             return codec
-    
-    # Last resort: MJPG, which works on almost all platforms
-    if validate_codec('MJPG', width, height, fps):
-        return 'MJPG'
-    
+
     raise RuntimeError(f"No compatible codec found for {ext} format on this system")
 
 

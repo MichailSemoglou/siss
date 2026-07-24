@@ -10,10 +10,11 @@ and named two-color palettes.
 ![GitHub license](https://img.shields.io/github/license/MichailSemoglou/siss)
 ![Python version](https://img.shields.io/badge/python-3.7%2B-blue)
 ![PyPI version](https://img.shields.io/pypi/v/siss)
-![PyPI downloads](https://img.shields.io/pypi/dm/siss)
 [![PyPI Downloads](https://static.pepy.tech/personalized-badge/siss?period=total&units=INTERNATIONAL_SYSTEM&left_color=GREY&right_color=BLUE&left_text=downloads)](https://pepy.tech/projects/siss)
 ![GitHub issues](https://img.shields.io/github/issues/MichailSemoglou/siss)
 ![GitHub last commit](https://img.shields.io/github/last-commit/MichailSemoglou/siss)
+
+![Duotone and halftone effects applied to a video](examples/demo.gif)
 
 ## Features
 
@@ -25,7 +26,13 @@ and named two-color palettes.
 
 ## Installation
 
-### Option 1: Clone and Install
+### Install from PyPI
+
+```bash
+pip install siss
+```
+
+### Clone for Development
 
 1. Clone this repository:
 
@@ -42,15 +49,17 @@ and named two-color palettes.
    ```
 
 3. Install the required dependencies:
+
    ```bash
    pip install -r requirements.txt
    ```
 
-### Option 2: Install from Source
-
-```bash
-pip install siss
-```
+4. Install the package so the `siss` command is available:
+   ```bash
+   pip install .
+   # or, for an editable install that picks up source changes:
+   pip install -e .
+   ```
 
 ## Usage
 
@@ -63,7 +72,7 @@ siss input_video.mp4 output_video.mp4 --effect duotone
 For a source checkout without installing:
 
 ```bash
-python3 src/main.py input_video.mp4 output_video.mp4 --effect duotone
+PYTHONPATH=src python3 -m siss.main input_video.mp4 output_video.mp4 --effect duotone
 ```
 
 The output format is determined by the file extension of the output path. Supported video containers: MP4, MOV, AVI, MKV, WMV. Supported still-image formats: PNG, JPEG, BMP, TIFF, WebP.
@@ -181,14 +190,14 @@ siss input.mov output.mov --effect duotone --color1 0 0 255 --color2 255 255 0
 
 ## Project Structure
 
-- `src/`
+- `src/siss/`
   - `main.py` – command-line interface and argument parsing
   - `colors.py` – hex, CSS name, and RGB parsing; curated palette registry
   - `duotone.py` – per-frame luminance-to-gradient mapping
   - `halftone.py` – per-frame symbol rendering at luminance-proportional sizes
   - `codec_fix.py` – adaptive `cv2.VideoWriter_fourcc` selection per OS and format
   - `utils/`
-    - `video_processing.py` – frame extraction, writing, and video property utilities
+    - `video_processing.py` – frame-by-frame video processing, still-image processing, and format/canvas utilities
 
 ## Requirements
 
@@ -218,10 +227,16 @@ Frames are processed sequentially to keep memory use bounded. For large inputs:
 To contribute:
 
 1. Fork the repository.
-2. Create a feature branch: `git checkout -b feature/short-description`.
-3. Commit your changes: `git commit -m 'Add halftone slash rendering'`.
-4. Push to the branch: `git push origin feature/short-description`.
-5. Open a pull request describing what changed and why.
+2. Install the development dependencies: optionally `pip install -e .` for an editable install, then `pip install -r requirements-dev.txt`.
+3. Run the test suite: `pytest`.
+4. Create a feature branch: `git checkout -b feature/short-description`.
+5. Commit your changes: `git commit -m 'Add halftone slash rendering'`.
+6. Push to the branch: `git push origin feature/short-description`.
+7. Open a pull request describing what changed and why.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for release history.
 
 ## License
 

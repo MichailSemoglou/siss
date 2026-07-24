@@ -15,7 +15,7 @@ from unittest import mock
 
 import numpy as np
 
-from codec_fix import (
+from siss.codec_fix import (
     get_compatible_codec,
     validate_codec,
     get_working_codec,
@@ -27,7 +27,7 @@ class TestGetCompatibleCodec(unittest.TestCase):
     """Tests for OS- and extension-based codec selection."""
 
     def _by_os(self, system):
-        with mock.patch("codec_fix.platform.system", return_value=system):
+        with mock.patch("siss.codec_fix.platform.system", return_value=system):
             return {
                 ".mp4": get_compatible_codec("out.mp4"),
                 ".mov": get_compatible_codec("out.mov"),
@@ -67,11 +67,11 @@ class TestGetCompatibleCodec(unittest.TestCase):
             self.assertEqual(codecs[".unknown"], "mp4v")
 
     def test_uppercase_extension_normalized(self):
-        with mock.patch("codec_fix.platform.system", return_value="Linux"):
+        with mock.patch("siss.codec_fix.platform.system", return_value="Linux"):
             self.assertEqual(get_compatible_codec("OUT.MP4"), "mp4v")
 
     def test_case_insensitive_extension(self):
-        with mock.patch("codec_fix.platform.system", return_value="Darwin"):
+        with mock.patch("siss.codec_fix.platform.system", return_value="Darwin"):
             self.assertEqual(get_compatible_codec("clip.MOV"), "avc1")
 
 
@@ -102,6 +102,21 @@ class TestValidateCodec(unittest.TestCase):
             self.skipTest("mp4v codec not available")
         self.assertTrue(result)
 
+    def test_probe_file_uses_requested_extension(self):
+        # The temp file created for probing should carry the requested
+        # container extension rather than a hardcoded '.mp4'.
+        seen_suffixes = []
+        real_tempfile = __import__("tempfile").NamedTemporaryFile
+
+        def spy_tempfile(*args, **kwargs):
+            seen_suffixes.append(kwargs.get("suffix"))
+            return real_tempfile(*args, **kwargs)
+
+        for ext in (".avi", ".mov", ".mkv", ".wmv"):
+            with mock.patch("siss.codec_fix.tempfile.NamedTemporaryFile", side_effect=spy_tempfile):
+                validate_codec("mp4v", 64, 48, fps=10.0, ext=ext)
+            self.assertEqual(seen_suffixes[-1], ext)
+
 
 class TestGetWorkingCodec(unittest.TestCase):
     """Tests for the fallback codec resolution chain."""
@@ -117,7 +132,7 @@ class TestGetWorkingCodec(unittest.TestCase):
 
     def test_raises_runtime_error_when_nothing_works(self):
         # Force every validation to fail -> should raise RuntimeError.
-        with mock.patch("codec_fix.validate_codec", return_value=False):
+        with mock.patch("siss.codec_fix.validate_codec", return_value=False):
             with self.assertRaises(RuntimeError) as ctx:
                 get_working_codec("out.mp4", 64, 48, fps=10.0)
             self.assertIn("No compatible codec", str(ctx.exception))
@@ -125,30 +140,49 @@ class TestGetWorkingCodec(unittest.TestCase):
     def test_uses_primary_codec_when_it_works(self):
         # If the OS-specific primary codec validates, it should be returned
         # directly without trying fallbacks.
-        with mock.patch("codec_fix.platform.system", return_value="Linux"):
-            with mock.patch("codec_fix.validate_codec", return_value=True) as vc:
+        with mock.patch("siss.codec_fix.platform.system", return_value="Linux"):
+            with mock.patch("siss.codec_fix.validate_codec", return_value=True) as vc:
                 codec = get_working_codec("out.mp4", 64, 48)
         self.assertEqual(codec, "mp4v")  # Linux primary for .mp4
         # validate_codec should have been called exactly once (primary only).
         self.assertEqual(vc.call_count, 1)
 
     def test_fallback_chain_tried_when_primary_fails(self):
-        # On Darwin, the primary codec for .mp4 is 'avc1'. Make it fail,
-        # and let the first fallback ('mp4v') succeed.
+        # On Darwin, the primary codec for .mp4 is 'avc1'. Fail every
+        # codec except the final MJPG last-resort fallback, so the full
+        # fallback chain is exercised, and confirm every call carries the
+        # requested container extension.
         call_log = []
 
-        def fake_validate(codec, w, h, fps=30.0):
-            call_log.append(codec)
-            # 'avc1' (primary) fails; 'mp4v' (first fallback) succeeds.
-            return codec == "mp4v"
+        def fake_validate(codec, w, h, fps=30.0, *, ext):
+            call_log.append((codec, ext))
+            # Only MJPG (the last-resort fallback) succeeds.
+            return codec == "MJPG"
 
-        with mock.patch("codec_fix.platform.system", return_value="Darwin"):
-            with mock.patch("codec_fix.validate_codec", side_effect=fake_validate):
+        with mock.patch("siss.codec_fix.platform.system", return_value="Darwin"):
+            with mock.patch("siss.codec_fix.validate_codec", side_effect=fake_validate):
                 codec = get_working_codec("out.mp4", 64, 48)
-        self.assertEqual(codec, "mp4v")
-        # Primary (avc1) + at least one fallback (mp4v) were attempted.
-        self.assertGreaterEqual(len(call_log), 2)
-        self.assertIn("avc1", call_log)
+        self.assertEqual(codec, "MJPG")
+        tried_codecs = [c for c, _ in call_log]
+        # Primary (avc1), at least one fallback, and MJPG were all attempted.
+        self.assertIn("avc1", tried_codecs)
+        self.assertGreater(len(tried_codecs), 2)
+        self.assertEqual(tried_codecs[-1], "MJPG")
+        # Every validate_codec call must receive the requested extension.
+        for _, ext in call_log:
+            self.assertEqual(ext, ".mp4")
+
+    def test_propagates_output_extension_to_validate_codec(self):
+        # get_working_codec should forward the output file's extension to
+        # validate_codec for every supported container.
+        for ext in (".mp4", ".avi", ".mov", ".mkv", ".wmv"):
+            with mock.patch(
+                "siss.codec_fix.validate_codec", return_value=True
+            ) as vc:
+                get_working_codec(f"out{ext}", 64, 48, fps=10.0)
+            vc.assert_called_once()
+            _, kwargs = vc.call_args
+            self.assertEqual(kwargs.get("ext"), ext)
 
 
 class TestCreateVideoWriter(unittest.TestCase):
@@ -173,7 +207,7 @@ class TestCreateVideoWriter(unittest.TestCase):
                 os.unlink(tmp)
 
     def test_raises_runtime_error_when_all_codecs_fail(self):
-        with mock.patch("codec_fix.get_working_codec", side_effect=RuntimeError):
+        with mock.patch("siss.codec_fix.get_working_codec", side_effect=RuntimeError):
             with self.assertRaises(RuntimeError):
                 create_video_writer("out.mp4", fps=10.0, width=64, height=48)
 

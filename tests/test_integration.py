@@ -6,7 +6,6 @@ with patched ``sys.argv``, and verify output properties: file existence,
 dimensions, frame count, FPS, and pixel-level effects.
 """
 import os
-import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -14,28 +13,8 @@ from unittest import mock
 import cv2
 import numpy as np
 
-_src_dir = os.path.join(os.path.dirname(__file__), "..", "src")
-_src_dir = os.path.abspath(_src_dir)
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
-
-from main import main
-
-
-def _make_gradient_video(path, width=160, height=120, frames=5, fps=30.0):
-    """Write a minimal gradient video to *path* using the mp4v codec."""
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    writer = cv2.VideoWriter(path, fourcc, fps, (width, height))
-    if not writer.isOpened():
-        writer.release()
-        raise unittest.SkipTest("mp4v codec not available in this environment")
-    for _ in range(frames):
-        frame = np.zeros((height, width, 3), dtype=np.uint8)
-        for y in range(height):
-            value = int(y * 255 / height)
-            frame[y, :] = [value, value, value]
-        writer.write(frame)
-    writer.release()
+from siss.main import main
+from tests.helpers import make_gradient_image, make_test_video
 
 
 class TestIntegrationDuotone(unittest.TestCase):
@@ -45,7 +24,7 @@ class TestIntegrationDuotone(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.input_path = os.path.join(self.tmp.name, "input.mp4")
         self.output_path = os.path.join(self.tmp.name, "output.mp4")
-        _make_gradient_video(self.input_path)
+        make_test_video(self.input_path, gradient=True)
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -140,7 +119,7 @@ class TestIntegrationHalftone(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.input_path = os.path.join(self.tmp.name, "input.mp4")
         self.output_path = os.path.join(self.tmp.name, "output.mp4")
-        _make_gradient_video(self.input_path, frames=1)
+        make_test_video(self.input_path, frames=1, gradient=True)
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -237,11 +216,7 @@ class TestIntegrationStillImages(unittest.TestCase):
         self.input_path = os.path.join(self.tmp.name, "input.png")
         self.output_path = os.path.join(self.tmp.name, "output.png")
 
-        image = np.zeros((120, 160, 3), dtype=np.uint8)
-        for y in range(120):
-            value = int(y * 255 / 120)
-            image[y, :] = [value, value, value]
-        cv2.imwrite(self.input_path, image)
+        make_gradient_image(self.input_path)
 
     def tearDown(self):
         self.tmp.cleanup()

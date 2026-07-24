@@ -1,16 +1,15 @@
 """
 Pytest root configuration.
 
-Adds src/ to sys.path so every test module uses the same flat import
-style that the package itself uses internally and that setup.py exposes
-to installers (package_dir={"":"src"}):
+Adds src/ to sys.path so the ``siss`` package is importable from a
+source checkout without installing it first:
 
-    from codec_fix import ...
-    from utils.video_processing import ...
+    from siss.main import ...
+    from siss.utils.video_processing import ...
 
 Only src/ is added; the repo root is intentionally omitted to prevent
 the same module from being importable under two names (e.g. both
-``colors`` and ``src.colors``), which would split module state.
+``siss.colors`` and ``src.siss.colors``), which would split module state.
 """
 import os
 import sys

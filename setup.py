@@ -1,38 +1,15 @@
-from setuptools import setup, find_packages
+from setuptools import setup
 from pathlib import Path
 import re
 
-# Single source of truth: read version from src/__init__.py
-_init = (Path(__file__).parent / "src" / "__init__.py").read_text()
+# Single source of truth: read version from src/siss/__init__.py
+_init = (Path(__file__).parent / "src" / "siss" / "__init__.py").read_text()
 __version__ = re.search(r"__version__\s*=\s*['\"]([^'\"]+)['\"]", _init).group(1)
 
-# Try to read the long description from description.md
-try:
-    this_directory = Path(__file__).parent
-    long_description = (this_directory / "description.md").read_text()
-except Exception:
-    long_description = """
-# Siss
-
-A command-line utility for applying artistic effects to videos.
-
-## Key Features
-
-- **Duotone Effect**: Creates stylish two-color videos, mapping colors to dark and light areas
-- **Halftone Effect**: Creates artistic videos using symbol patterns that vary in size based on brightness
-- **Cross-platform Compatibility**: Works on Windows, macOS, and Linux with automatic codec detection
-- **Progress Tracking**: Shows real-time processing progress with estimated completion time
-
-## Quick Start
-
-After installation, use Siss as a command-line tool:
-
-```bash
-siss input_video.mp4 output_video.mp4 --effect duotone
-```
-
-For complete documentation, visit the [GitHub repository](https://github.com/MichailSemoglou/siss).
-"""
+# The PyPI long description is maintained in description.md (shipped in the
+# sdist via MANIFEST.in). Fail the build loudly if it is missing rather than
+# falling back to a second, drifting copy.
+long_description = (Path(__file__).parent / "description.md").read_text(encoding="utf-8")
 
 setup(
     name="siss",
@@ -44,9 +21,8 @@ setup(
     author_email="m.semoglou@qide.studio",
     url="https://github.com/MichailSemoglou/siss",
     license="MIT",
-    packages=["utils"],
+    packages=["siss", "siss.utils"],
     package_dir={"": "src"},
-    py_modules=["main", "duotone", "halftone", "codec_fix", "colors"],
     install_requires=[
         "opencv-python>=4.5.0",
         "numpy>=1.20.0",
@@ -55,7 +31,7 @@ setup(
     python_requires=">=3.7",
     entry_points={
         "console_scripts": [
-            "siss=main:main",
+            "siss=siss.main:main",
         ],
     },
     classifiers=[

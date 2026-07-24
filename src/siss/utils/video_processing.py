@@ -2,14 +2,13 @@
 Utility functions for video processing operations.
 
 This module provides helper functions for common video operations like
-loading videos, extracting frames, and saving processed results.
+loading videos and saving processed results.
 """
 import cv2
-import numpy as np
 import os
 from tqdm import tqdm
 
-from codec_fix import create_video_writer
+from ..codec_fix import create_video_writer
 
 
 def load_video(video_path):
@@ -47,72 +46,6 @@ def get_video_properties(video_capture):
         'height': int(video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT)),
         'frame_count': int(video_capture.get(cv2.CAP_PROP_FRAME_COUNT)),
     }
-
-
-def extract_frames(video_capture, show_progress=True):
-    """
-    Extract all frames from a video.
-
-    Args:
-        video_capture (cv2.VideoCapture): OpenCV VideoCapture object
-        show_progress (bool): Whether to show a progress bar
-
-    Returns:
-        list: List of frames as numpy arrays
-    """
-    frames = []
-    frame_count = int(video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
-
-    if show_progress:
-        progress_bar = tqdm(total=frame_count, desc="Extracting frames")
-
-    while True:
-        ret, frame = video_capture.read()
-        if not ret:
-            break
-        frames.append(frame)
-
-        if show_progress:
-            progress_bar.update(1)
-
-    if show_progress:
-        progress_bar.close()
-
-    return frames
-
-
-def save_video(output_path, frames, fps, show_progress=True):
-    """
-    Save a list of frames as a video file.
-
-    Args:
-        output_path (str): Path where the video will be saved
-        frames (list): List of frames as numpy arrays
-        fps (float): Frames per second for the output video
-        show_progress (bool): Whether to show a progress bar
-
-    Raises:
-        ValueError: If no frames are provided
-    """
-    if not frames:
-        raise ValueError("No frames to save.")
-
-    height, width, _ = frames[0].shape
-    video_writer = create_video_writer(output_path, fps, width, height)
-
-    progress_bar = tqdm(total=len(frames), desc="Saving video") if show_progress else None
-
-    try:
-        for frame in frames:
-            video_writer.write(frame)
-            if progress_bar is not None:
-                progress_bar.update(1)
-    finally:
-        if progress_bar is not None:
-            progress_bar.close()
-        video_writer.release()
-
-    print(f"Video saved to {output_path}")
 
 
 IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.webp'}
@@ -206,16 +139,20 @@ def process_video_frames(video_path, output_path, process_function, **kwargs):
             out.release()
 
 
-def release_resources(video_capture, video_writer=None):
+def process_media(input_path, output_path, process_function, **kwargs):
     """
-    Release video resources.
+    Process a video or still image, chosen from the output path extension.
+
+    Still-image extensions dispatch to process_image(), everything else to
+    process_video_frames(). This is the single dispatch point used by the
+    effect entry points, so callers do not repeat the extension check.
 
     Args:
-        video_capture (cv2.VideoCapture): OpenCV VideoCapture object
-        video_writer (cv2.VideoWriter, optional): OpenCV VideoWriter object
+        input_path (str): Path to the input video or image
+        output_path (str): Path where the processed result will be saved
+        process_function (callable): Function to apply to each frame
+        **kwargs: Additional arguments to pass to the process_function
     """
-    if video_capture is not None:
-        video_capture.release()
-
-    if video_writer is not None:
-        video_writer.release()
+    if is_image_file(output_path):
+        return process_image(input_path, output_path, process_function, **kwargs)
+    return process_video_frames(input_path, output_path, process_function, **kwargs)

@@ -10,26 +10,17 @@ The video-rendering paths in main() are exercised via the existing
 test_duotone / test_halftone suites and manual smoke tests.
 """
 import os
-import sys
 import unittest
 from argparse import Namespace
 from unittest import mock
 
-# main.py uses the installed-package import style (from duotone import ...),
-# same as the rest of the codebase. Ensure src/ is importable as top-level
-# modules when running from a source checkout.
-_src_dir = os.path.join(os.path.dirname(__file__), "..", "src")
-_src_dir = os.path.abspath(_src_dir)
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
-
-from main import (  # noqa: E402
+from siss.main import (
     resolve_color_arg,
     _resolve_colors,
     main,
     validate_file_path,
-    is_image_file,
 )
+from siss.utils.video_processing import is_image_file
 
 
 def _ns(**kwargs):
@@ -176,7 +167,7 @@ class TestMainVideoEffects(unittest.TestCase):
         self.tmp.cleanup()
 
     def test_duotone_effect_returns_zero(self):
-        with mock.patch("main.apply_duotone") as mock_dt:
+        with mock.patch("siss.main.apply_duotone") as mock_dt:
             with mock.patch(
                 "sys.argv",
                 ["siss", self.input_path, self.output_path, "--effect", "duotone"],
@@ -186,7 +177,7 @@ class TestMainVideoEffects(unittest.TestCase):
         mock_dt.assert_called_once()
 
     def test_halftone_effect_returns_zero(self):
-        with mock.patch("main.apply_halftone") as mock_ht:
+        with mock.patch("siss.main.apply_halftone") as mock_ht:
             with mock.patch(
                 "sys.argv",
                 [
@@ -202,7 +193,7 @@ class TestMainVideoEffects(unittest.TestCase):
         mock_ht.assert_called_once()
 
     def test_duotone_color_args_forwarded(self):
-        with mock.patch("main.apply_duotone") as mock_dt:
+        with mock.patch("siss.main.apply_duotone") as mock_dt:
             with mock.patch(
                 "sys.argv",
                 [
@@ -225,7 +216,7 @@ class TestMainVideoEffects(unittest.TestCase):
         self.assertEqual(call_args[3], (0, 255, 255))  # color2_rgb
 
     def test_halftone_symbol_args_forwarded(self):
-        with mock.patch("main.apply_halftone") as mock_ht:
+        with mock.patch("siss.main.apply_halftone") as mock_ht:
             with mock.patch(
                 "sys.argv",
                 [
@@ -247,7 +238,7 @@ class TestMainVideoEffects(unittest.TestCase):
         self.assertEqual(call_args[1].get("symbol_type"), "asterisk")
 
     def test_halftone_dot_symbol_and_grid_type_forwarded(self):
-        with mock.patch("main.apply_halftone") as mock_ht:
+        with mock.patch("siss.main.apply_halftone") as mock_ht:
             with mock.patch(
                 "sys.argv",
                 [
@@ -269,7 +260,7 @@ class TestMainVideoEffects(unittest.TestCase):
 
     def test_output_directory_created_if_missing(self):
         nested_out = os.path.join(self.tmp.name, "newdir", "out.mp4")
-        with mock.patch("main.apply_duotone"):
+        with mock.patch("siss.main.apply_duotone"):
             with mock.patch(
                 "sys.argv",
                 ["siss", self.input_path, nested_out, "--effect", "duotone"],
@@ -279,7 +270,7 @@ class TestMainVideoEffects(unittest.TestCase):
         self.assertTrue(os.path.isdir(os.path.join(self.tmp.name, "newdir")))
 
     def test_unexpected_exception_returns_one(self):
-        with mock.patch("main.apply_duotone", side_effect=RuntimeError("boom")):
+        with mock.patch("siss.main.apply_duotone", side_effect=RuntimeError("boom")):
             with mock.patch(
                 "sys.argv",
                 ["siss", self.input_path, self.output_path, "--effect", "duotone"],
@@ -289,7 +280,12 @@ class TestMainVideoEffects(unittest.TestCase):
 
 
 class TestMainImageEffects(unittest.TestCase):
-    """Tests for the still-image rendering paths inside main()."""
+    """Tests for still-image runs through main().
+
+    The video/still dispatch itself lives in process_media() and is covered
+    in test_video_processing.py; here we only check that main() forwards the
+    paths to the single per-effect entry point.
+    """
 
     def setUp(self):
         import tempfile
@@ -298,59 +294,59 @@ class TestMainImageEffects(unittest.TestCase):
         self.input_path = os.path.join(self.tmp.name, "input.png")
         self.output_path = os.path.join(self.tmp.name, "output.png")
 
-        # A placeholder file is enough: apply_duotone_image/apply_halftone_image
-        # are fully mocked, so main() only needs the path to pass os.path.isfile().
+        # A placeholder file is enough: the effect entry points are fully
+        # mocked, so main() only needs the path to pass os.path.isfile().
         open(self.input_path, "wb").close()
 
     def tearDown(self):
         self.tmp.cleanup()
 
-    def test_duotone_image_extension_dispatches_to_image_path(self):
-        with mock.patch("main.apply_duotone_image") as mock_dt_img:
-            with mock.patch("main.apply_duotone") as mock_dt_vid:
-                with mock.patch(
-                    "sys.argv",
-                    ["siss", self.input_path, self.output_path, "--effect", "duotone"],
-                ):
-                    rc = main()
+    def test_duotone_image_run_calls_apply_duotone(self):
+        with mock.patch("siss.main.apply_duotone") as mock_dt:
+            with mock.patch(
+                "sys.argv",
+                ["siss", self.input_path, self.output_path, "--effect", "duotone"],
+            ):
+                rc = main()
         self.assertEqual(rc, 0)
-        mock_dt_img.assert_called_once()
-        mock_dt_vid.assert_not_called()
+        mock_dt.assert_called_once()
+        call_args = mock_dt.call_args[0]
+        self.assertEqual(call_args[0], self.input_path)
+        self.assertEqual(call_args[1], self.output_path)
 
-    def test_halftone_image_extension_dispatches_to_image_path(self):
-        with mock.patch("main.apply_halftone_image") as mock_ht_img:
-            with mock.patch("main.apply_halftone") as mock_ht_vid:
-                with mock.patch(
-                    "sys.argv",
-                    [
-                        "siss",
-                        self.input_path,
-                        self.output_path,
-                        "--effect",
-                        "halftone",
-                    ],
-                ):
-                    rc = main()
+    def test_halftone_image_run_calls_apply_halftone(self):
+        with mock.patch("siss.main.apply_halftone") as mock_ht:
+            with mock.patch(
+                "sys.argv",
+                [
+                    "siss",
+                    self.input_path,
+                    self.output_path,
+                    "--effect",
+                    "halftone",
+                ],
+            ):
+                rc = main()
         self.assertEqual(rc, 0)
-        mock_ht_img.assert_called_once()
-        mock_ht_vid.assert_not_called()
+        mock_ht.assert_called_once()
+        call_args = mock_ht.call_args[0]
+        self.assertEqual(call_args[0], self.input_path)
+        self.assertEqual(call_args[1], self.output_path)
 
-    def test_duotone_video_extension_uses_video_path(self):
+    def test_duotone_video_run_uses_same_entry_point(self):
         output_path = os.path.join(self.tmp.name, "output.mp4")
-        with mock.patch("main.apply_duotone_image") as mock_dt_img:
-            with mock.patch("main.apply_duotone") as mock_dt_vid:
-                with mock.patch(
-                    "sys.argv",
-                    ["siss", self.input_path, output_path, "--effect", "duotone"],
-                ):
-                    rc = main()
+        with mock.patch("siss.main.apply_duotone") as mock_dt:
+            with mock.patch(
+                "sys.argv",
+                ["siss", self.input_path, output_path, "--effect", "duotone"],
+            ):
+                rc = main()
         self.assertEqual(rc, 0)
-        mock_dt_img.assert_not_called()
-        mock_dt_vid.assert_called_once()
+        mock_dt.assert_called_once()
 
 
 class TestIsImageFile(unittest.TestCase):
-    """Tests for the image-extension detector imported into main."""
+    """Tests for the image-extension detector."""
 
     def test_png_is_image(self):
         self.assertTrue(is_image_file("frame.png"))

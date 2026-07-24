@@ -1,53 +1,32 @@
 """
-Unit tests for src/utils/video_processing.py.
+Unit tests for src/siss/utils/video_processing.py.
 
 Covers:
-  - get_codec_for_file(): extension-to-codec mapping
+  - is_image_file(): extension detection
+  - process_image(): output creation, missing-input guard, kwargs forwarding
   - load_video(): success and FileNotFoundError paths
   - get_video_properties(): keys, types, and dimension accuracy
-  - extract_frames(): frame count, dtype, dimensions, progress-bar flag
-  - save_video(): file creation, empty-frame guard, progress-bar flag
   - process_video_frames(): identity passthrough, missing-input guard,
     kwargs forwarding
+  - process_media(): extension-based dispatch and kwargs forwarding
 """
 import os
-import sys
 import tempfile
 import unittest
+from unittest import mock
 
 import cv2
 import numpy as np
 
-from utils.video_processing import (
-    extract_frames,
+from siss.utils.video_processing import (
     get_video_properties,
     is_image_file,
     load_video,
     process_image,
+    process_media,
     process_video_frames,
-    save_video,
 )
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _make_test_video(path, width=160, height=120, frames=5, fps=30.0):
-    """Write a minimal solid-black video to *path* using the mp4v codec.
-
-    Raises unittest.SkipTest if the writer cannot be opened, so any setUp
-    that calls this function skips its tests gracefully in environments
-    where mp4v / the target container is unavailable.
-    """
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    writer = cv2.VideoWriter(path, fourcc, fps, (width, height))
-    if not writer.isOpened():
-        writer.release()
-        raise unittest.SkipTest("mp4v codec not available in this environment")
-    for _ in range(frames):
-        writer.write(np.zeros((height, width, 3), dtype=np.uint8))
-    writer.release()
+from tests.helpers import make_test_video
 
 
 # ---------------------------------------------------------------------------
@@ -127,7 +106,7 @@ class TestLoadVideo(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.path = os.path.join(self.tmp.name, "clip.mp4")
-        _make_test_video(self.path)
+        make_test_video(self.path)
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -156,7 +135,7 @@ class TestGetVideoProperties(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         path = os.path.join(self.tmp.name, "clip.mp4")
-        _make_test_video(path, width=160, height=120, frames=5, fps=24.0)
+        make_test_video(path, width=160, height=120, frames=5, fps=24.0)
         self.cap = cv2.VideoCapture(path)
         if not self.cap.isOpened():
             self.cap.release()
@@ -193,104 +172,6 @@ class TestGetVideoProperties(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# extract_frames
-# ---------------------------------------------------------------------------
-
-class TestExtractFrames(unittest.TestCase):
-    """extract_frames() returns correct frame list."""
-
-    def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
-        self.path = os.path.join(self.tmp.name, "clip.mp4")
-        _make_test_video(self.path, width=160, height=120, frames=5)
-
-    def tearDown(self):
-        self.tmp.cleanup()
-
-    def _open(self):
-        return cv2.VideoCapture(self.path)
-
-    def test_returns_all_frames(self):
-        cap = self._open()
-        try:
-            frames = extract_frames(cap, show_progress=False)
-            self.assertEqual(len(frames), 5)
-        finally:
-            cap.release()
-
-    def test_frames_are_numpy_arrays(self):
-        cap = self._open()
-        try:
-            frames = extract_frames(cap, show_progress=False)
-            self.assertIsInstance(frames[0], np.ndarray)
-        finally:
-            cap.release()
-
-    def test_frame_dimensions(self):
-        cap = self._open()
-        try:
-            frames = extract_frames(cap, show_progress=False)
-            h, w, c = frames[0].shape
-            self.assertEqual(w, 160)
-            self.assertEqual(h, 120)
-            self.assertEqual(c, 3)
-        finally:
-            cap.release()
-
-    def test_with_progress_bar_does_not_raise(self):
-        cap = self._open()
-        try:
-            frames = extract_frames(cap, show_progress=True)
-            self.assertEqual(len(frames), 5)
-        finally:
-            cap.release()
-
-
-# ---------------------------------------------------------------------------
-# save_video
-# ---------------------------------------------------------------------------
-
-class TestSaveVideo(unittest.TestCase):
-    """save_video() persists frames to disk and guards against empty input."""
-
-    def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
-        self.out_path = os.path.join(self.tmp.name, "out.mp4")
-        self.frames = [
-            np.zeros((120, 160, 3), dtype=np.uint8) for _ in range(5)
-        ]
-
-    def tearDown(self):
-        self.tmp.cleanup()
-
-    def test_creates_output_file(self):
-        save_video(self.out_path, self.frames, fps=30, show_progress=False)
-        if not os.path.exists(self.out_path) or os.path.getsize(self.out_path) == 0:
-            self.skipTest("Codec produced no output in this environment")
-        self.assertTrue(os.path.exists(self.out_path))
-
-    def test_empty_frames_raises_value_error(self):
-        with self.assertRaises(ValueError):
-            save_video(self.out_path, [], fps=30)
-
-    def test_with_progress_bar_does_not_raise(self):
-        save_video(self.out_path, self.frames, fps=30, show_progress=True)
-        if not os.path.exists(self.out_path) or os.path.getsize(self.out_path) == 0:
-            self.skipTest("Codec produced no output in this environment")
-        self.assertTrue(os.path.exists(self.out_path))
-
-    def test_output_is_readable_video(self):
-        save_video(self.out_path, self.frames, fps=30, show_progress=False)
-        if not os.path.exists(self.out_path) or os.path.getsize(self.out_path) == 0:
-            self.skipTest("Codec produced no output in this environment")
-        cap = cv2.VideoCapture(self.out_path)
-        try:
-            self.assertTrue(cap.isOpened())
-        finally:
-            cap.release()
-
-
-# ---------------------------------------------------------------------------
 # process_video_frames
 # ---------------------------------------------------------------------------
 
@@ -301,7 +182,7 @@ class TestProcessVideoFrames(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.in_path = os.path.join(self.tmp.name, "in.mp4")
         self.out_path = os.path.join(self.tmp.name, "out.mp4")
-        _make_test_video(self.in_path, frames=3)
+        make_test_video(self.in_path, frames=3)
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -358,6 +239,41 @@ class TestProcessVideoFrames(unittest.TestCase):
             )
         except (cv2.error, RuntimeError):
             self.skipTest("Codec not available in this environment")
+
+
+# ---------------------------------------------------------------------------
+# process_media
+# ---------------------------------------------------------------------------
+
+class TestProcessMedia(unittest.TestCase):
+    """process_media() dispatches on the output path extension."""
+
+    def test_image_extension_routes_to_process_image(self):
+        with mock.patch(
+            "siss.utils.video_processing.process_image"
+        ) as image_fn, mock.patch(
+            "siss.utils.video_processing.process_video_frames"
+        ) as video_fn:
+            process_media("in.png", "out.png", lambda f: f)
+        image_fn.assert_called_once()
+        video_fn.assert_not_called()
+
+    def test_video_extension_routes_to_process_video_frames(self):
+        with mock.patch(
+            "siss.utils.video_processing.process_image"
+        ) as image_fn, mock.patch(
+            "siss.utils.video_processing.process_video_frames"
+        ) as video_fn:
+            process_media("in.mp4", "out.mp4", lambda f: f)
+        video_fn.assert_called_once()
+        image_fn.assert_not_called()
+
+    def test_kwargs_are_forwarded(self):
+        with mock.patch(
+            "siss.utils.video_processing.process_video_frames"
+        ) as video_fn:
+            process_media("in.mp4", "out.mp4", lambda f: f, alpha=0.5)
+        self.assertEqual(video_fn.call_args[1].get("alpha"), 0.5)
 
 
 if __name__ == "__main__":

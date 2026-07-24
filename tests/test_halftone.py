@@ -6,7 +6,8 @@ import os
 import tempfile
 import numpy as np
 import cv2
-from halftone import apply_halftone, apply_halftone_image
+from siss.halftone import apply_halftone, apply_halftone_image
+from tests.helpers import make_gradient_image, make_test_video
 
 
 class TestHalftone(unittest.TestCase):
@@ -20,23 +21,7 @@ class TestHalftone(unittest.TestCase):
         self.output_path = os.path.join(self.temp_dir.name, "test_output.mp4")
         
         # Create a simple test video (10 frames, gradient color)
-        width, height = 320, 240
-        fps = 30
-        
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out = cv2.VideoWriter(self.input_path, fourcc, fps, (width, height))
-        
-        # Create 10 frames
-        for i in range(10):
-            # Create gradient frame
-            frame = np.zeros((height, width, 3), dtype=np.uint8)
-            for y in range(height):
-                value = int(y * 255 / height)
-                frame[y, :] = [value, value, value]
-            
-            out.write(frame)
-        
-        out.release()
+        make_test_video(self.input_path, width=320, height=240, frames=10, gradient=True)
     
     def tearDown(self):
         """Clean up test environment."""
@@ -153,12 +138,7 @@ class TestHalftoneImage(unittest.TestCase):
         self.output_path = os.path.join(self.temp_dir.name, "test_output.png")
 
         # Create a simple gradient image
-        height, width = 240, 320
-        image = np.zeros((height, width, 3), dtype=np.uint8)
-        for y in range(height):
-            value = int(y * 255 / height)
-            image[y, :] = [value, value, value]
-        cv2.imwrite(self.input_path, image)
+        make_gradient_image(self.input_path, width=320, height=240)
 
     def tearDown(self):
         self.temp_dir.cleanup()

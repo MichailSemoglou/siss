@@ -21,6 +21,7 @@ Public API
    parse_color
    get_palette
    list_palettes
+   validate_rgb
    PALETTES
    CSS_NAMED_COLORS
 """
@@ -383,6 +384,49 @@ def list_palettes() -> str:
     return "\n".join(lines)
 
 
+def validate_rgb(color: Iterable) -> Tuple[int, int, int]:
+    """
+    Validate an RGB triple and return it as a tuple of three ints.
+
+    Shared by the effect processors, which receive colors that did not
+    necessarily pass through :func:`parse_color`.
+
+    Parameters
+    ----------
+    color : iterable
+        Candidate ``(r, g, b)`` value.
+
+    Returns
+    -------
+    tuple
+        ``(r, g, b)`` with each component in ``0..255``.
+
+    Raises
+    ------
+    ValueError
+        If the value is not iterable, does not have exactly three
+        channels, contains a non-integer (or boolean) channel, or any
+        channel is outside ``0..255``.
+    """
+    try:
+        values = tuple(color)
+    except TypeError:
+        raise ValueError(f"Expected an iterable of 3 RGB values, got {color!r}") from None
+    if len(values) != 3:
+        raise ValueError(
+            f"Expected 3 RGB values, got {len(values)}: {color!r}"
+        )
+    if not all(isinstance(c, int) and not isinstance(c, bool) for c in values):
+        raise ValueError(
+            f"RGB color values must be integers, got {values!r}"
+        )
+    if not all(0 <= c <= 255 for c in values):
+        raise ValueError(
+            f"RGB color values must be between 0 and 255, got {values}"
+        )
+    return values
+
+
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
@@ -416,8 +460,4 @@ def _coerce_rgb(values) -> Tuple[int, int, int]:
         rgb = tuple(int(v) for v in values)
     except (TypeError, ValueError):
         raise ValueError(f"RGB values must be integers: {values!r}")
-    if any(c < 0 or c > 255 for c in rgb):
-        raise ValueError(
-            f"RGB color values must be between 0 and 255, got {rgb}"
-        )
-    return rgb  # type: ignore[return-value]
+    return validate_rgb(rgb)

@@ -18,10 +18,9 @@ import sys
 import os
 from typing import List, Optional, Tuple
 
-from duotone import apply_duotone, apply_duotone_image
-from halftone import apply_halftone, apply_halftone_image
-from colors import parse_color, get_palette, list_palettes
-from utils.video_processing import is_image_file
+from .duotone import apply_duotone
+from .halftone import apply_halftone
+from .colors import parse_color, get_palette, list_palettes
 
 
 def validate_file_path(file_path, check_exists=True):
@@ -243,44 +242,25 @@ def main():
         # Resolve colors (palette + explicit overrides).
         color1_rgb, color2_rgb = _resolve_colors(args)
 
-        # Apply selected effect, dispatching to video or image path by the
-        # output file extension.
+        # Apply the selected effect. Each entry point dispatches to the
+        # video or still-image path based on the output file extension.
         if args.effect == "duotone":
-            if is_image_file(args.output):
-                apply_duotone_image(
-                    input_path,
-                    args.output,
-                    color1_rgb,
-                    color2_rgb,
-                )
-            else:
-                apply_duotone(
-                    input_path,
-                    args.output,
-                    color1_rgb,
-                    color2_rgb,
-                )
+            apply_duotone(
+                input_path,
+                args.output,
+                color1_rgb,
+                color2_rgb,
+            )
         elif args.effect == "halftone":
-            if is_image_file(args.output):
-                apply_halftone_image(
-                    input_path,
-                    args.output,
-                    args.symbol_size,
-                    color1_rgb,
-                    color2_rgb,
-                    symbol_type=args.symbol_type,
-                    grid_type=args.grid_type,
-                )
-            else:
-                apply_halftone(
-                    input_path,
-                    args.output,
-                    args.symbol_size,
-                    color1_rgb,
-                    color2_rgb,
-                    symbol_type=args.symbol_type,
-                    grid_type=args.grid_type,
-                )
+            apply_halftone(
+                input_path,
+                args.output,
+                args.symbol_size,
+                color1_rgb,
+                color2_rgb,
+                symbol_type=args.symbol_type,
+                grid_type=args.grid_type,
+            )
 
     except (FileNotFoundError, ValueError) as e:
         print(f"Error: {e}", file=sys.stderr)
