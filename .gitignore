@@ -237,3 +237,6 @@ Thumbs.db
 
 # Local roadmap
 /ROADMAP.md
+
+# Kilo configuration (local development only)
+kilo.json

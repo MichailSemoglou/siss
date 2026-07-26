@@ -1,6 +1,8 @@
 """
 Module for applying duotone color effects to videos and still images.
 """
+from typing import Callable, Tuple
+
 import cv2
 import numpy as np
 
@@ -8,7 +10,9 @@ from .colors import validate_rgb
 from .utils.video_processing import process_media
 
 
-def _make_duotone_processor(color1_rgb, color2_rgb):
+def _make_duotone_processor(
+    color1_rgb: Tuple[int, int, int], color2_rgb: Tuple[int, int, int]
+) -> Callable[[np.ndarray], np.ndarray]:
     """
     Build and return the per-frame closure used by both video and image paths.
 
@@ -30,7 +34,7 @@ def _make_duotone_processor(color1_rgb, color2_rgb):
     return _duotone_frame
 
 
-def apply_duotone(video_path, output_path, color1_rgb, color2_rgb):
+def apply_duotone(video_path: str, output_path: str, color1_rgb: Tuple[int, int, int], color2_rgb: Tuple[int, int, int], no_audio: bool = False) -> None:
     """
     Apply duotone color effect to a video or still image.
 
@@ -43,17 +47,20 @@ def apply_duotone(video_path, output_path, color1_rgb, color2_rgb):
         output_path (str): Path where the processed result will be saved
         color1_rgb (tuple): RGB color for dark areas (r, g, b), values 0-255
         color2_rgb (tuple): RGB color for light areas (r, g, b), values 0-255
+        no_audio (bool): When True, skip the ffmpeg audio-merge step (videos only)
 
     Raises:
         FileNotFoundError: If the input cannot be opened
         ValueError: If the colors are not valid RGB values
     """
     process_media(
-        video_path, output_path, _make_duotone_processor(color1_rgb, color2_rgb)
+        video_path, output_path,
+        _make_duotone_processor(color1_rgb, color2_rgb),
+        no_audio=no_audio,
     )
 
 
-def apply_duotone_image(image_path, output_path, color1_rgb, color2_rgb):
+def apply_duotone_image(image_path: str, output_path: str, color1_rgb: Tuple[int, int, int], color2_rgb: Tuple[int, int, int]) -> None:
     """
     Apply duotone color effect to a still image.
 

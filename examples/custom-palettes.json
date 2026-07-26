@@ -1,0 +1,14 @@
+{
+  "brand-blue": {
+    "color1": "#001f3f",
+    "color2": "#7fdbff"
+  },
+  "brand-warm": {
+    "color1": "#3b1f4b",
+    "color2": "#f6c453"
+  },
+  "slate": {
+    "color1": "#0d0221",
+    "color2": "#ff2a6d"
+  }
+}

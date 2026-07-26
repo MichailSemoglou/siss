@@ -32,6 +32,7 @@ def _ns(**kwargs):
         color1=None,
         color2=None,
         palette=None,
+        palette_file=None,
         list_palettes=False,
         symbol_size=10,
         symbol_type="plus",
@@ -95,6 +96,43 @@ class TestResolveColors(unittest.TestCase):
     def test_palette_unknown_raises(self):
         with self.assertRaises(ValueError):
             _resolve_colors(_ns(palette="nonexistent"))
+
+
+class TestResolveColorsCustomPalettes(unittest.TestCase):
+    """Tests for _resolve_colors with custom palettes from --palette-file."""
+
+    def setUp(self):
+        self.custom = {
+            "brand": ((10, 20, 30), (40, 50, 60)),
+            "sunset": ((255, 255, 255), (0, 0, 0)),
+        }
+
+    def test_custom_palette_lookup(self):
+        c1, c2 = _resolve_colors(_ns(palette="brand"), self.custom)
+        self.assertEqual(c1, (10, 20, 30))
+        self.assertEqual(c2, (40, 50, 60))
+
+    def test_custom_palette_overrides_builtin(self):
+        c1, c2 = _resolve_colors(_ns(palette="sunset"), self.custom)
+        self.assertEqual(c1, (255, 255, 255))
+        self.assertEqual(c2, (0, 0, 0))
+
+    def test_builtin_palette_still_works_with_custom_loaded(self):
+        c1, c2 = _resolve_colors(_ns(palette="noir"), self.custom)
+        self.assertEqual(c1, (0, 0, 0))
+        self.assertEqual(c2, (229, 229, 229))
+
+    def test_no_custom_palettes_does_not_affect_builtin(self):
+        c1, c2 = _resolve_colors(_ns(palette="noir"), None)
+        self.assertEqual(c1, (0, 0, 0))
+        self.assertEqual(c2, (229, 229, 229))
+
+    def test_explicit_flag_overrides_custom_palette(self):
+        c1, c2 = _resolve_colors(
+            _ns(palette="brand", color1=["gold"]), self.custom
+        )
+        self.assertEqual(c1, (255, 215, 0))
+        self.assertEqual(c2, (40, 50, 60))
 
 
 class TestMainEntryPoint(unittest.TestCase):
@@ -356,6 +394,101 @@ class TestIsImageFile(unittest.TestCase):
 
     def test_mp4_is_not_image(self):
         self.assertFalse(is_image_file("clip.mp4"))
+
+
+class TestMainPaletteFile(unittest.TestCase):
+    """Tests for the --palette-file CLI flag inside main()."""
+
+    def setUp(self):
+        import json
+        import tempfile
+
+        self.tmp = tempfile.TemporaryDirectory()
+        self.input_path = os.path.join(self.tmp.name, "input.mp4")
+        self.output_path = os.path.join(self.tmp.name, "output.mp4")
+        open(self.input_path, "wb").close()
+
+        self.palette_path = os.path.join(self.tmp.name, "p.json")
+        with open(self.palette_path, "w") as f:
+            json.dump(
+                {"brand": {"color1": "#ff0000", "color2": "#00ffff"}}, f
+            )
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_palette_file_used_in_effect_run(self):
+        with mock.patch("siss.main.apply_duotone") as mock_dt:
+            with mock.patch(
+                "sys.argv",
+                [
+                    "siss",
+                    self.input_path,
+                    self.output_path,
+                    "--effect",
+                    "duotone",
+                    "--palette",
+                    "brand",
+                    "--palette-file",
+                    self.palette_path,
+                ],
+            ):
+                rc = main()
+        self.assertEqual(rc, 0)
+        call_args = mock_dt.call_args[0]
+        self.assertEqual(call_args[2], (255, 0, 0))    # color1 from file
+        self.assertEqual(call_args[3], (0, 255, 255))  # color2 from file
+
+    def test_list_palettes_with_palette_file(self):
+        with mock.patch("builtins.print") as mock_print:
+            with mock.patch(
+                "sys.argv",
+                ["siss", "--list-palettes", "--palette-file", self.palette_path],
+            ):
+                rc = main()
+        self.assertEqual(rc, 0)
+        printed = " ".join(
+            str(arg) for call in mock_print.call_args_list for arg in call[0]
+        )
+        self.assertIn("brand", printed)
+        self.assertIn("sunset", printed)
+
+    def test_missing_palette_file_returns_error(self):
+        with mock.patch(
+            "sys.argv",
+            [
+                "siss",
+                self.input_path,
+                self.output_path,
+                "--effect",
+                "duotone",
+                "--palette",
+                "brand",
+                "--palette-file",
+                os.path.join(self.tmp.name, "missing.json"),
+            ],
+        ):
+            rc = main()
+        self.assertEqual(rc, 1)
+
+    def test_invalid_palette_file_returns_error(self):
+        bad_path = os.path.join(self.tmp.name, "bad.json")
+        with open(bad_path, "w") as f:
+            f.write("{not json")
+        with mock.patch(
+            "sys.argv",
+            [
+                "siss",
+                self.input_path,
+                self.output_path,
+                "--effect",
+                "duotone",
+                "--palette-file",
+                bad_path,
+            ],
+        ):
+            rc = main()
+        self.assertEqual(rc, 1)
 
 
 if __name__ == "__main__":

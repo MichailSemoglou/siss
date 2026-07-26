@@ -14,15 +14,15 @@ and named two-color palettes.
 ![GitHub issues](https://img.shields.io/github/issues/MichailSemoglou/siss)
 ![GitHub last commit](https://img.shields.io/github/last-commit/MichailSemoglou/siss)
 
-![Duotone and halftone effects applied to a video](examples/demo.gif)
-
 ## Features
 
 - **Duotone** – maps per-pixel luminance to a linear gradient between two RGB colors; `color1` is applied to dark areas, `color2` to light areas
 - **Halftone** – renders plus, asterisk, slash, or dot symbols at sizes proportional to local luminance (3×3-pixel sampled average), with independent symbol and background colors, over a square or hex-offset sampling grid
 - **Color input** – accepts 3- and 6-digit hex strings (with or without `#`), case-insensitive CSS named colors, RGB integer triples, and named two-color palettes via `--palette`
 - **Codec selection** – probes `cv2.VideoWriter_fourcc` candidates per output format and OS at runtime; falls back through a priority list until a working codec is found
+- **Audio passthrough** – after rendering, merges the original audio track into the output with `ffmpeg` (no video re-encode); disable with `--no-audio`
 - **Output formats** – writes MP4, MOV, AVI, MKV, and WMV videos, plus PNG, JPEG, BMP, TIFF, and WebP still images; the format is inferred from the output file extension
+- **Custom palettes** – load your own two-color looks from a JSON file with `--palette-file`; custom names shadow built-in ones
 
 ## Installation
 
@@ -161,6 +161,8 @@ Codec selection for video output is **automatic** — the tool probes available 
 - `--symbol_size` – symbol size for halftone (default: `10`)
 - `--symbol_type` – halftone symbol shape: `plus`, `asterisk`, `slash`, or `dot` (default: `plus`)
 - `--grid_type` – halftone sampling grid: `square` or `hex` (default: `square`); `hex` staggers alternating rows by half a step for a traditional print-halftone dot screen
+- `--no-audio` – skip merging the original audio track into the output video (default: merge audio when `ffmpeg` is available)
+- `--palette-file` – path to a JSON file of custom palettes; each entry must have `"color1"` and `"color2"` keys in the same formats as `--color1`/`--color2`. Custom names override built-in ones.
 
 ## Examples
 
@@ -188,11 +190,24 @@ MOV input and output:
 siss input.mov output.mov --effect duotone --color1 0 0 255 --color2 255 255 0
 ```
 
+Disable audio passthrough:
+
+```bash
+siss input.mp4 output.mp4 --effect halftone --no-audio
+```
+
+Load custom palettes from a file:
+
+```bash
+siss input.mp4 output.mp4 --effect duotone --palette-file examples/custom-palettes.json --palette brand-warm
+```
+
 ## Project Structure
 
 - `src/siss/`
   - `main.py` – command-line interface and argument parsing
-  - `colors.py` – hex, CSS name, and RGB parsing; curated palette registry
+  - `audio.py` – ffmpeg audio-track passthrough for video output
+  - `colors.py` – hex, CSS name, and RGB parsing; curated palette registry; custom palette file loading
   - `duotone.py` – per-frame luminance-to-gradient mapping
   - `halftone.py` – per-frame symbol rendering at luminance-proportional sizes
   - `codec_fix.py` – adaptive `cv2.VideoWriter_fourcc` selection per OS and format
@@ -205,6 +220,7 @@ siss input.mov output.mov --effect duotone --color1 0 0 255 --color2 255 255 0
 - OpenCV (`cv2`)
 - NumPy
 - tqdm
+- ffmpeg (optional — for audio passthrough in video output)
 
 ## Troubleshooting
 

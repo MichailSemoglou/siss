@@ -27,10 +27,11 @@ Public API
 """
 from __future__ import annotations
 
-from typing import Iterable, Tuple, Union
+import json
+from typing import Dict, Iterable, Optional, Tuple, Union
 
 # A single color can be supplied as many things.
-ColorLike = Union[str, int, Iterable]
+ColorLike = Union[str, Iterable]
 
 
 # ---------------------------------------------------------------------------
@@ -309,7 +310,13 @@ def parse_color(color: ColorLike) -> Tuple[int, int, int]:
 
     # --- Hex (with or without '#') -------------------------------------------
     if text.startswith("#"):
-        return _parse_hex(text[1:])
+        digits = text[1:]
+        if _looks_like_hex(digits):
+            return _parse_hex(digits)
+        raise ValueError(
+            f"Could not parse color {color!r}. Use a hex string ('#ff0044'), "
+            f"a CSS name ('rebeccapurple'), or 3 RGB ints ([255, 0, 0])."
+        )
     # Heuristic: bare hex like "ff0044" or "f04". We deliberately exclude
     # values that are valid CSS names (e.g. "bad" would otherwise be read
     # as the 3-digit hex #baaadd), so try CSS names first for short tokens.
@@ -333,14 +340,23 @@ def parse_color(color: ColorLike) -> Tuple[int, int, int]:
     )
 
 
-def get_palette(name: str) -> Tuple[Tuple[int, int, int], Tuple[int, int, int]]:
+def get_palette(
+    name: str,
+    custom_palettes: Optional[Dict[str, Tuple[Tuple[int, int, int], Tuple[int, int, int]]]] = None,
+) -> Tuple[Tuple[int, int, int], Tuple[int, int, int]]:
     """
-    Look up a curated palette by name and return ``(color1_rgb, color2_rgb)``.
+    Look up a palette by name and return ``(color1_rgb, color2_rgb)``.
+
+    Custom palettes from a ``--palette-file`` take precedence over the
+    built-in ones when both share the same name.
 
     Parameters
     ----------
     name : str
         Palette name (case-insensitive).
+    custom_palettes : dict or None
+        Palette mapping loaded from a JSON file via :func:`load_palette_file`,
+        or ``None`` when ``--palette-file`` was not passed.
 
     Returns
     -------
@@ -354,34 +370,119 @@ def get_palette(name: str) -> Tuple[Tuple[int, int, int], Tuple[int, int, int]]:
         available palettes to help discovery.
     """
     key = name.strip().lower()
+    if custom_palettes and key in custom_palettes:
+        return custom_palettes[key]
     if key not in PALETTES:
+        available = sorted(set(PALETTES.keys()) | set(custom_palettes or {}))
         raise ValueError(
             f"Unknown palette {name!r}. Available palettes: "
-            f"{', '.join(sorted(PALETTES.keys()))}."
+            f"{', '.join(available)}."
         )
     palette = PALETTES[key]
     return parse_color(palette["color1"]), parse_color(palette["color2"])
 
 
-def list_palettes() -> str:
+def list_palettes(
+    custom_palettes: Optional[Dict[str, Tuple[Tuple[int, int, int], Tuple[int, int, int]]]] = None,
+) -> str:
     """
-    Return a human-readable, plain-text catalog of the curated palettes.
+    Return a human-readable, plain-text catalog of the available palettes.
 
-    Each line shows the palette name, its two hex colors, and a short
-    description. Suitable for printing directly from the CLI.
+    When *custom_palettes* is not ``None``, entries from the
+    ``--palette-file`` are included and marked as custom. Custom names
+    that shadow built-in ones replace the built-in entry in the listing.
+
+    Suitable for printing directly from the CLI.
     """
     lines = ["Curated palettes (--palette <name>):", ""]
+    custom_names = {name.lower() for name in (custom_palettes or {})}
+
+    # Built-in palettes, skipping any names overridden by custom palettes.
     for name, p in PALETTES.items():
+        if name.lower() in custom_names:
+            continue
         lines.append(
             f"  {name:<10} {p['color1']} -> {p['color2']}"
             f"   {p.get('description', '')}"
         )
+
+    # Custom palettes (from --palette-file).
+    if custom_palettes:
+        lines.append("")
+        lines.append("Custom palettes (--palette-file):")
+        lines.append("")
+        for name in sorted(custom_palettes):
+            c1, c2 = custom_palettes[name]
+            tag = " (overrides built-in)" if name.lower() in PALETTES else ""
+            c1_hex = f"#{c1[0]:02x}{c1[1]:02x}{c1[2]:02x}"
+            c2_hex = f"#{c2[0]:02x}{c2[1]:02x}{c2[2]:02x}"
+            lines.append(f"  {name:<10} {c1_hex} -> {c2_hex}{tag}")
+
     lines.append("")
     lines.append(
         "Tip: override one slot with --color1/--color2 "
         "(hex, CSS name, or 'R G B')."
     )
     return "\n".join(lines)
+
+
+def load_palette_file(path: str) -> Dict[str, Tuple[Tuple[int, int, int], Tuple[int, int, int]]]:
+    """
+    Load custom palettes from a JSON file and return a mapping of
+    ``{name: (color1_rgb, color2_rgb)}``.
+
+    The file must be a JSON object whose keys are palette names and whose
+    values are objects with ``"color1"`` and ``"color2"`` keys. Each
+    color value is parsed through :func:`parse_color`, so it accepts hex
+    strings, CSS names, and RGB triples.
+
+    Parameters
+    ----------
+    path : str
+        Path to a JSON palette file.
+
+    Returns
+    -------
+    dict
+        ``{name: (color1_rgb, color2_rgb)}``, with names lowercased.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the file does not exist.
+    ValueError
+        If the file is not valid JSON, a palette entry is missing
+        ``color1`` or ``color2``, or a color value is invalid.
+    """
+    with open(path) as f:
+        try:
+            data = json.load(f)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Invalid JSON in palette file {path!r}: {exc}") from exc
+
+    if not isinstance(data, dict):
+        raise ValueError(
+            f"Palette file {path!r} must contain a JSON object, "
+            f"got {type(data).__name__}"
+        )
+
+    palettes: Dict[str, Tuple[Tuple[int, int, int], Tuple[int, int, int]]] = {}
+    for name, spec in data.items():
+        if not isinstance(spec, dict):
+            raise ValueError(
+                f"Palette entry {name!r} must be an object with "
+                f"'color1' and 'color2' keys"
+            )
+        missing = [k for k in ("color1", "color2") if k not in spec]
+        if missing:
+            raise ValueError(
+                f"Palette entry {name!r} is missing key(s): "
+                f"{', '.join(missing)}"
+            )
+        c1 = parse_color(spec["color1"])
+        c2 = parse_color(spec["color2"])
+        palettes[name.strip().lower()] = (c1, c2)
+    return palettes
 
 
 def validate_rgb(color: Iterable) -> Tuple[int, int, int]:
@@ -438,19 +539,18 @@ def _looks_like_hex(text: str) -> bool:
 
 
 def _parse_hex(digits: str) -> Tuple[int, int, int]:
-    """Convert a hex string (no '#') of length 3 or 6 into an RGB tuple."""
-    digits = digits.strip().lstrip("#")
+    """Convert a hex string (with or without '#', length 3 or 6) into RGB.
+
+    Callers guarantee the input is valid hex; this function does not
+    re-validate the digit characters.
+    """
+    digits = digits.lstrip("#")
     if len(digits) == 3:
         digits = "".join(c * 2 for c in digits)
-    if len(digits) != 6 or not all(c in _HEX_DIGITS for c in digits):
-        raise ValueError(f"Invalid hex color: #{digits}")
-    r = int(digits[0:2], 16)
-    g = int(digits[2:4], 16)
-    b = int(digits[4:6], 16)
-    return (r, g, b)
+    return (int(digits[0:2], 16), int(digits[2:4], 16), int(digits[4:6], 16))
 
 
-def _coerce_rgb(values) -> Tuple[int, int, int]:
+def _coerce_rgb(values: Iterable[Union[str, int]]) -> Tuple[int, int, int]:
     """Validate and convert a 3-element iterable of int-like values to RGB."""
     values = tuple(values)
     for v in values:

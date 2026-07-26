@@ -14,16 +14,16 @@ Output format is chosen from the output path extension: ``.mp4``/``.mov`` write
 a video, while ``.png``/``.jpg``/``.webp`` write a single still image.
 """
 import argparse
-import sys
 import os
+import sys
 from typing import List, Optional, Tuple
 
+from .colors import get_palette, list_palettes, load_palette_file, parse_color
 from .duotone import apply_duotone
 from .halftone import apply_halftone
-from .colors import parse_color, get_palette, list_palettes
 
 
-def validate_file_path(file_path, check_exists=True):
+def validate_file_path(file_path: str, check_exists: bool = True) -> str:
     """
     Validate file path.
 
@@ -142,6 +142,19 @@ def parse_arguments():
     )
 
     parser.add_argument(
+        "--palette-file",
+        type=str,
+        default=None,
+        metavar="PATH",
+        help=(
+            "Path to a JSON file of custom palettes. "
+            "Each entry must have 'color1' and 'color2' keys; "
+            "colors accept the same forms as --color1/--color2. "
+            "Custom names override built-in ones."
+        ),
+    )
+
+    parser.add_argument(
         "--list-palettes",
         action="store_true",
         help="Print the available curated palettes and exit.",
@@ -174,32 +187,50 @@ def parse_arguments():
         ),
     )
 
+    parser.add_argument(
+        "--no-audio",
+        action="store_true",
+        help=(
+            "Skip merging the original audio track into the output video. "
+            "By default, Siss copies audio from the source with ffmpeg "
+            "after rendering."
+        ),
+    )
+
     return parser.parse_args()
 
 
-def _resolve_colors(args):
+def _resolve_colors(
+    args,
+    custom_palettes=None,
+) -> Tuple[Tuple[int, int, int], Tuple[int, int, int]]:
     """
     Resolve the final (color1_rgb, color2_rgb) pair.
 
     Precedence (highest to lowest) for each slot:
         1. Explicit --color1 / --color2 flag.
-        2. --palette value.
+        2. --palette value (custom palettes from --palette-file take
+           priority over built-in ones with the same name).
         3. Built-in defaults (red / cyan).
+
+    Parameters
+    ----------
+    args : Namespace
+        Parsed CLI arguments.
+    custom_palettes : dict or None
+        Mapping loaded from --palette-file via load_palette_file().
 
     Returns
     -------
     tuple
         ((r, g, b), (r, g, b)) validated RGB tuples.
     """
-    # Defaults match the documented original behavior.
-    color1_rgb = (255, 0, 0)   # red  -> darks / symbols
-    color2_rgb = (0, 255, 255)  # cyan -> lights / background
+    color1_rgb = (255, 0, 0)
+    color2_rgb = (0, 255, 255)
 
-    # Palette provides a baseline that explicit flags can override.
     if args.palette:
-        color1_rgb, color2_rgb = get_palette(args.palette)
+        color1_rgb, color2_rgb = get_palette(args.palette, custom_palettes)
 
-    # Explicit flags win over palette.
     color1_rgb = resolve_color_arg(args.color1, color1_rgb)
     color2_rgb = resolve_color_arg(args.color2, color2_rgb)
 
@@ -211,9 +242,14 @@ def main():
     try:
         args = parse_arguments()
 
-        # --list-palettes is a self-contained help-style command.
+        # Load custom palettes early so --list-palettes can show them too.
+        custom_palettes = None
+        if args.palette_file:
+            validate_file_path(args.palette_file, check_exists=True)
+            custom_palettes = load_palette_file(args.palette_file)
+
         if args.list_palettes:
-            print(list_palettes())
+            print(list_palettes(custom_palettes))
             return 0
 
         # For any real run we need input, output, and an effect.
@@ -239,8 +275,8 @@ def main():
         if output_dir:
             os.makedirs(output_dir, exist_ok=True)
 
-        # Resolve colors (palette + explicit overrides).
-        color1_rgb, color2_rgb = _resolve_colors(args)
+        # Resolve colors (palette + explicit overrides + custom palette file).
+        color1_rgb, color2_rgb = _resolve_colors(args, custom_palettes)
 
         # Apply the selected effect. Each entry point dispatches to the
         # video or still-image path based on the output file extension.
@@ -250,6 +286,7 @@ def main():
                 args.output,
                 color1_rgb,
                 color2_rgb,
+                no_audio=args.no_audio,
             )
         elif args.effect == "halftone":
             apply_halftone(
@@ -260,6 +297,7 @@ def main():
                 color2_rgb,
                 symbol_type=args.symbol_type,
                 grid_type=args.grid_type,
+                no_audio=args.no_audio,
             )
 
     except (FileNotFoundError, ValueError) as e:

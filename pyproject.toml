@@ -6,3 +6,20 @@ build-backend = "setuptools.build_meta"
 minversion = "6.0"
 addopts = "-ra -q"
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py37"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.9"
+ignore_missing_imports = true
+files = ["src/siss"]
+
+[[tool.mypy.overrides]]
+module = "cv2"
+ignore_errors = true

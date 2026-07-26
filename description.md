@@ -14,6 +14,8 @@ and named two-color palettes.
 - **Color input** – accepts 3- and 6-digit hex strings (with or without `#`), case-insensitive CSS named colors, RGB integer triples, and named two-color palettes via `--palette`
 - **Still-image output** – write PNG, JPEG, BMP, TIFF, or WebP by using an image extension for the output path; reuses the same per-frame effect closures as video output
 - **Codec selection** – probes `cv2.VideoWriter_fourcc` candidates per output format and OS; falls back through a priority list until a working codec is found
+- **Audio passthrough** – copies the original audio track into the output with `ffmpeg` after rendering; disable with `--no-audio`
+- **Custom palettes** – load your own two-color looks from a JSON file with `--palette-file`; custom names shadow built-in ones
 
 ## Installation
 
@@ -77,3 +79,4 @@ See the [GitHub repository](https://github.com/MichailSemoglou/siss) for full do
 - OpenCV (`cv2`)
 - NumPy
 - tqdm
+- ffmpeg (optional — for audio passthrough)

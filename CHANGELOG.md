@@ -5,6 +5,26 @@ All notable changes to the Siss project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-07-26
+
+### Added
+
+- Audio passthrough for video output. OpenCV `VideoWriter` writes silent files; after rendering, `merge_audio` in the new `src/siss/audio.py` copies the original audio track into the output with `ffmpeg` (`-c:a copy -c:v copy`, no re-encode). The merge happens automatically for video output and is skipped when `ffmpeg` is not on PATH (warning to stderr) or when the source has no audio stream.
+- `--no-audio` CLI flag to skip the audio merge. Forwarded through `apply_duotone`, `apply_halftone`, and `process_media`; still-image paths ignore it.
+- Unit tests for the audio module in `tests/test_audio.py` (18 tests). Covers `_has_audio_stream`, `merge_audio`, process-media dispatch, and effect-function forwarding.
+- `ruff` and `mypy` configurations in `pyproject.toml`. All 9 source files pass both tools with no issues.
+
+### Changed
+
+- `process_video_frames` restructured: `out` and `progress_bar` are initialized to `None` before a single `try/finally` block, removing the nested structure and the `if 'out' in locals()` guard.
+- `validate_codec` simplified: uses `mkstemp` instead of `NamedTemporaryFile` with `delete=False`, removing the overlapping context-manager and manual-cleanup paths. Behavior is unchanged.
+- `_parse_hex` no longer re-validates hex digits; the two callers guarantee valid input through `_looks_like_hex` or the `#`-prefix guard. Behavior is unchanged.
+- Halftone grid-sizing constants are documented inline in `src/siss/halftone.py`.
+
+### Fixed
+
+- `ColorLike` type alias in `src/siss/colors.py` no longer advertises `int`, matching the actual behavior of `parse_color`, which rejects bare integers.
+
 ## [0.6.0] - 2026-07-24
 
 ### Changed

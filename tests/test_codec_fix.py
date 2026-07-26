@@ -103,18 +103,17 @@ class TestValidateCodec(unittest.TestCase):
         self.assertTrue(result)
 
     def test_probe_file_uses_requested_extension(self):
-        # The temp file created for probing should carry the requested
-        # container extension rather than a hardcoded '.mp4'.
         seen_suffixes = []
-        real_tempfile = __import__("tempfile").NamedTemporaryFile
+        real_mkstemp = __import__("tempfile").mkstemp
 
-        def spy_tempfile(*args, **kwargs):
+        def spy_mkstemp(*args, **kwargs):
             seen_suffixes.append(kwargs.get("suffix"))
-            return real_tempfile(*args, **kwargs)
+            return real_mkstemp(*args, **kwargs)
 
         for ext in (".avi", ".mov", ".mkv", ".wmv"):
-            with mock.patch("siss.codec_fix.tempfile.NamedTemporaryFile", side_effect=spy_tempfile):
-                validate_codec("mp4v", 64, 48, fps=10.0, ext=ext)
+            with mock.patch("siss.codec_fix.tempfile.mkstemp", side_effect=spy_mkstemp):
+                with mock.patch("siss.codec_fix.os.close"):
+                    validate_codec("mp4v", 64, 48, fps=10.0, ext=ext)
             self.assertEqual(seen_suffixes[-1], ext)
 
 

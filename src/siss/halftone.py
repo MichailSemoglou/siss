@@ -1,6 +1,8 @@
 """
 Module for applying halftone pattern effects to videos and still images.
 """
+from typing import Callable, Dict, Tuple
+
 import cv2
 import numpy as np
 
@@ -8,8 +10,13 @@ from .colors import validate_rgb
 from .utils.video_processing import process_media
 
 
-def _make_halftone_processor(symbol_size, color1_rgb, color2_rgb,
-                            symbol_type='plus', grid_type='square'):
+def _make_halftone_processor(
+    symbol_size: int,
+    color1_rgb: Tuple[int, int, int],
+    color2_rgb: Tuple[int, int, int],
+    symbol_type: str = 'plus',
+    grid_type: str = 'square',
+) -> Callable[[np.ndarray], np.ndarray]:
     """
     Build and return the per-frame closure used by both video and image paths.
 
@@ -29,8 +36,11 @@ def _make_halftone_processor(symbol_size, color1_rgb, color2_rgb,
         raise ValueError("Symbol size must be greater than 0")
 
     def _halftone_frame(frame):
-        # Determine grid parameters from the actual frame size
         h, w = frame.shape[:2]
+
+        # Grid density scales with frame width: the largest symbol is at
+        # most 1/20th of the width.  The minimum sampling step is 4 px so
+        # that single-pixel or blank frames still produce a visible grid.
         adjusted = min(symbol_size, w // 20)
         step = max(adjusted // 2, 4)
         half = step // 2
@@ -72,7 +82,7 @@ def _make_halftone_processor(symbol_size, color1_rgb, color2_rgb,
     return _halftone_frame
 
 
-def _grid_means(integral, ys, xs, h, w, k=3):
+def _grid_means(integral: np.ndarray, ys: np.ndarray, xs: np.ndarray, h: int, w: int, k: int = 3) -> np.ndarray:
     """
     Mean luminance of the k x k region anchored at each grid point.
 
@@ -88,7 +98,7 @@ def _grid_means(integral, ys, xs, h, w, k=3):
     return sums / counts
 
 
-def _draw_symbols(halftone, symbol_type, cx, cy, sizes):
+def _draw_symbols(halftone: np.ndarray, symbol_type: str, cx: np.ndarray, cy: np.ndarray, sizes: np.ndarray) -> None:
     """
     Draw a batch of symbols on the single-channel mask, grouped by size.
 
@@ -114,21 +124,21 @@ def _draw_symbols(halftone, symbol_type, cx, cy, sizes):
         _BULK_DRAWERS[symbol_type](halftone, x, y, int(size))
 
 
-def _scatter(halftone, rows, cols):
+def _scatter(halftone: np.ndarray, rows: np.ndarray, cols: np.ndarray) -> None:
     """Zero the in-bounds (row, col) positions of the symbol mask."""
     h, w = halftone.shape
     keep = (rows >= 0) & (rows < h) & (cols >= 0) & (cols < w)
     halftone[rows[keep], cols[keep]] = 0
 
 
-def _draw_plus_bulk(halftone, x, y, size):
+def _draw_plus_bulk(halftone: np.ndarray, x: np.ndarray, y: np.ndarray, size: int) -> None:
     """Draw plus symbols of one size centered at each (x, y)."""
     d = np.arange(-size, size + 1)
     _scatter(halftone, np.repeat(y, d.size), (x[:, np.newaxis] + d).ravel())
     _scatter(halftone, (y[:, np.newaxis] + d).ravel(), np.repeat(x, d.size))
 
 
-def _draw_asterisk_bulk(halftone, x, y, size):
+def _draw_asterisk_bulk(halftone: np.ndarray, x: np.ndarray, y: np.ndarray, size: int) -> None:
     """Draw asterisk symbols of one size centered at each (x, y)."""
     _draw_plus_bulk(halftone, x, y, size)
     d = np.arange(-size, size + 1)
@@ -137,14 +147,14 @@ def _draw_asterisk_bulk(halftone, x, y, size):
     _scatter(halftone, (y[:, np.newaxis] - d).ravel(), cols)
 
 
-def _draw_slash_bulk(halftone, x, y, size):
+def _draw_slash_bulk(halftone: np.ndarray, x: np.ndarray, y: np.ndarray, size: int) -> None:
     """Draw slash symbols of one size centered at each (x, y)."""
     d = np.arange(-size, size + 1)
     _scatter(halftone, (y[:, np.newaxis] - d).ravel(),
              (x[:, np.newaxis] + d).ravel())
 
 
-def _draw_dot_bulk(halftone, x, y, size):
+def _draw_dot_bulk(halftone: np.ndarray, x: np.ndarray, y: np.ndarray, size: int) -> None:
     """
     Draw filled dots of one size centered at each (x, y).
 
@@ -158,7 +168,7 @@ def _draw_dot_bulk(halftone, x, y, size):
              (x[:, np.newaxis] + (dx - size)).ravel())
 
 
-_BULK_DRAWERS = {
+_BULK_DRAWERS: Dict[str, Callable[..., None]] = {
     'plus': _draw_plus_bulk,
     'asterisk': _draw_asterisk_bulk,
     'slash': _draw_slash_bulk,
@@ -166,8 +176,16 @@ _BULK_DRAWERS = {
 }
 
 
-def apply_halftone(video_path, output_path, symbol_size, color1_rgb, color2_rgb,
-                  symbol_type='plus', grid_type='square'):
+def apply_halftone(
+    video_path: str,
+    output_path: str,
+    symbol_size: int,
+    color1_rgb: Tuple[int, int, int],
+    color2_rgb: Tuple[int, int, int],
+    symbol_type: str = 'plus',
+    grid_type: str = 'square',
+    no_audio: bool = False,
+) -> None:
     """
     Apply halftone pattern effect to a video or still image.
 
@@ -185,6 +203,7 @@ def apply_halftone(video_path, output_path, symbol_size, color1_rgb, color2_rgb,
         grid_type (str): Sampling grid layout ('square' or 'hex'). 'hex' offsets
             every other row by half a step, producing the staggered dot
             screen used in traditional print halftone reproduction.
+        no_audio (bool): When True, skip the ffmpeg audio-merge step (videos only)
 
     Raises:
         FileNotFoundError: If the input cannot be opened
@@ -195,13 +214,22 @@ def apply_halftone(video_path, output_path, symbol_size, color1_rgb, color2_rgb,
         video_path,
         output_path,
         _make_halftone_processor(
-            symbol_size, color1_rgb, color2_rgb, symbol_type=symbol_type, grid_type=grid_type
+            symbol_size, color1_rgb, color2_rgb,
+            symbol_type=symbol_type, grid_type=grid_type,
         ),
+        no_audio=no_audio,
     )
 
 
-def apply_halftone_image(image_path, output_path, symbol_size, color1_rgb, color2_rgb,
-                        symbol_type='plus', grid_type='square'):
+def apply_halftone_image(
+    image_path: str,
+    output_path: str,
+    symbol_size: int,
+    color1_rgb: Tuple[int, int, int],
+    color2_rgb: Tuple[int, int, int],
+    symbol_type: str = 'plus',
+    grid_type: str = 'square',
+) -> None:
     """
     Apply halftone pattern effect to a still image.
 
@@ -214,7 +242,7 @@ def apply_halftone_image(image_path, output_path, symbol_size, color1_rgb, color
     )
 
 
-def _draw_plus_symbol(halftone, center_x, center_y, size):
+def _draw_plus_symbol(halftone: np.ndarray, center_x: int, center_y: int, size: int) -> None:
     """Draw a plus symbol on the halftone image."""
     y1 = center_y
     x1 = max(0, center_x - size)
@@ -227,7 +255,7 @@ def _draw_plus_symbol(halftone, center_x, center_y, size):
     cv2.line(halftone, (x1, y1), (x1, y2), 0, 1)
 
 
-def _draw_asterisk_symbol(halftone, center_x, center_y, size):
+def _draw_asterisk_symbol(halftone: np.ndarray, center_x: int, center_y: int, size: int) -> None:
     """Draw an asterisk symbol on the halftone image."""
     _draw_plus_symbol(halftone, center_x, center_y, size)
 
@@ -244,7 +272,7 @@ def _draw_asterisk_symbol(halftone, center_x, center_y, size):
     cv2.line(halftone, (x1, y1), (x2, y2), 0, 1)
 
 
-def _draw_slash_symbol(halftone, center_x, center_y, size):
+def _draw_slash_symbol(halftone: np.ndarray, center_x: int, center_y: int, size: int) -> None:
     """Draw a slash symbol on the halftone image."""
     x1 = max(0, center_x - size)
     y1 = min(halftone.shape[0] - 1, center_y + size)
@@ -253,7 +281,7 @@ def _draw_slash_symbol(halftone, center_x, center_y, size):
     cv2.line(halftone, (x1, y1), (x2, y2), 0, 1)
 
 
-_EDGE_DRAWERS = {
+_EDGE_DRAWERS: Dict[str, Callable[..., None]] = {
     'asterisk': _draw_asterisk_symbol,
     'slash': _draw_slash_symbol,
 }
