@@ -75,7 +75,7 @@ See the [GitHub repository](https://github.com/MichailSemoglou/siss) for full do
 
 ## Requirements
 
-- Python 3.7+
+- Python 3.9+
 - OpenCV (`cv2`)
 - NumPy
 - tqdm

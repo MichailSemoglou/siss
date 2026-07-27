@@ -5,8 +5,8 @@ import json
 import os
 import tempfile
 import unittest
+
 from siss.colors import (
-    CSS_NAMED_COLORS,
     PALETTES,
     get_palette,
     list_palettes,

@@ -5,6 +5,31 @@ All notable changes to the Siss project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.2] - 2026-07-27
+
+### Added
+
+- CI workflow (`.github/workflows/ci.yml`): runs ruff, mypy, and pytest on push and PR across Python 3.9–3.13.
+- `--no-audio` CLI integration tests in `tests/test_main.py` (forwarding coverage through `main()`).
+- `TestSafeInt` in `tests/test_video_processing.py`: 6 edge-case tests for non-finite and negative values.
+
+### Changed
+
+- **Breaking:** `symbol_type`, `grid_type`, and `no_audio` are now keyword-only parameters in `apply_duotone`, `apply_halftone`, and `apply_halftone_image`. Positional pass-through sites in tests are updated.
+- Raise `python_requires` to `>=3.9`; ruff `target-version` to `py39`; drop Python 3.7 and 3.8 classifiers from `setup.py`.
+- Extracted `_validate_args_and_paths()` and `_dispatch_effect()` from `main()`; `main()` is now ~35 lines.
+- `main()` unexpected-error handler prints the full traceback alongside the one-line message.
+- `merge_audio` in `src/siss/audio.py` appends ffmpeg stderr to the warning on `CalledProcessError`.
+- `_has_audio_stream` in `src/siss/audio.py` checks `returncode == 0` before testing stdout contents.
+- `apply_duotone_image` and `apply_halftone_image` shims now accept and forward `no_audio`.
+
+### Fixed
+
+- `setup.py` version regex now guards against `None` match with a clear `RuntimeError`.
+- Unused `mock_stderr` variable removed from `tests/test_audio.py`.
+- Import ordering in all source and test files aligned with ruff `I` rule.
+- `tests/test_audio.py` docstring updated to note that `--no-audio` CLI tests live in `test_main.py`.
+
 ## [0.7.1] - 2026-07-27
 
 ### Changed

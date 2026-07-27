@@ -19,6 +19,7 @@ import cv2
 import numpy as np
 
 from siss.utils.video_processing import (
+    _safe_int,
     get_video_properties,
     is_image_file,
     load_video,
@@ -27,7 +28,6 @@ from siss.utils.video_processing import (
     process_video_frames,
 )
 from tests.helpers import make_test_video
-
 
 # ---------------------------------------------------------------------------
 # is_image_file
@@ -274,6 +274,28 @@ class TestProcessMedia(unittest.TestCase):
         ) as video_fn:
             process_media("in.mp4", "out.mp4", lambda f: f, alpha=0.5)
         self.assertEqual(video_fn.call_args[1].get("alpha"), 0.5)
+
+
+class TestSafeInt(unittest.TestCase):
+    """_safe_int() graceful-degradation edge cases."""
+
+    def test_normal_value(self):
+        self.assertEqual(_safe_int(42.0), 42)
+
+    def test_inf_returns_zero(self):
+        self.assertEqual(_safe_int(float('inf')), 0)
+
+    def test_nan_returns_zero(self):
+        self.assertEqual(_safe_int(float('nan')), 0)
+
+    def test_negative_returns_zero(self):
+        self.assertEqual(_safe_int(-1.0), 0)
+
+    def test_zero_returns_zero(self):
+        self.assertEqual(_safe_int(0.0), 0)
+
+    def test_negative_inf_returns_zero(self):
+        self.assertEqual(_safe_int(float('-inf')), 0)
 
 
 if __name__ == "__main__":

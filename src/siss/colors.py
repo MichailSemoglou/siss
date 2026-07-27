@@ -202,62 +202,62 @@ PALETTES = {
     "sunset": {
         "color1": "#3b1f4b",   # deep purple (darks / symbols)
         "color2": "#f6c453",   # warm gold (lights / background)
-        "description": "Deep purple to warm gold — warm and cinematic.",
+        "description": "Deep purple to warm gold. Warm and cinematic.",
     },
     "mint": {
         "color1": "#0b3142",   # dark teal
         "color2": "#a8e6cf",   # soft mint
-        "description": "Dark teal to soft mint — fresh and clean.",
+        "description": "Dark teal to soft mint. Fresh and clean.",
     },
     "cyberpunk": {
         "color1": "#0d0221",   # near-black indigo
         "color2": "#ff2a6d",   # hot magenta
-        "description": "Near-black indigo to hot magenta — neon and edgy.",
+        "description": "Near-black indigo to hot magenta. Neon and edgy.",
     },
     "sepia": {
         "color1": "#2b1d0e",   # dark espresso
         "color2": "#d8b48f",   # faded sepia
-        "description": "Dark espresso to faded sepia — vintage film feel.",
+        "description": "Dark espresso to faded sepia. Vintage film feel.",
     },
     "noir": {
         "color1": "#000000",   # pure black
         "color2": "#e5e5e5",   # soft white (not blown out)
-        "description": "Pure black to soft white — classic monochrome.",
+        "description": "Pure black to soft white. Classic monochrome.",
     },
     "ocean": {
         "color1": "#001f3f",   # navy
         "color2": "#7fdbff",   # aqua
-        "description": "Navy to aqua — cool and aquatic.",
+        "description": "Navy to aqua. Cool and aquatic.",
     },
     "forest": {
         "color1": "#1a2e1a",   # deep forest
         "color2": "#c7e9b4",   # pale leaf
-        "description": "Deep forest to pale leaf — earthy and natural.",
+        "description": "Deep forest to pale leaf. Earthy and natural.",
     },
     "rose": {
         "color1": "#5a1a2b",   # wine
         "color2": "#ffc0cb",   # pink
-        "description": "Wine to pink — soft and romantic.",
+        "description": "Wine to pink. Soft and romantic.",
     },
     "slate": {
         "color1": "#1f2933",   # ink
         "color2": "#aab8c2",   # cool gray
-        "description": "Ink to cool gray — modern and neutral.",
+        "description": "Ink to cool gray. Modern and neutral.",
     },
     "tropical": {
         "color1": "#003b46",   # deep teal
         "color2": "#ffd23f",   # sunshine yellow
-        "description": "Deep teal to sunshine yellow — bold and bright.",
+        "description": "Deep teal to sunshine yellow. Bold and bright.",
     },
     "candy": {
         "color1": "#3a0ca3",   # electric indigo
         "color2": "#f72585",   # bright pink
-        "description": "Electric indigo to bright pink — playful and loud.",
+        "description": "Electric indigo to bright pink. Playful and loud.",
     },
     "paper": {
         "color1": "#222222",   # ink black
         "color2": "#f4f1de",   # warm cream
-        "description": "Ink black to warm cream — print/screen friendly.",
+        "description": "Ink black to warm cream. Print-/screen-friendly.",
     },
 }
 

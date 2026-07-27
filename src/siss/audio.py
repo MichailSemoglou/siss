@@ -36,7 +36,7 @@ def _has_audio_stream(video_path: str) -> bool:
         )
     except (subprocess.TimeoutExpired, OSError):
         return False
-    return "audio" in result.stdout
+    return result.returncode == 0 and "audio" in result.stdout
 
 
 def merge_audio(source_path: str, output_path: str) -> bool:
@@ -88,7 +88,16 @@ def merge_audio(source_path: str, output_path: str) -> bool:
         )
         os.replace(tmp_path, output_path)
         return True
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):
+    except subprocess.CalledProcessError as e:
+        import sys
+        msg = "Warning: ffmpeg could not merge audio; output is silent."
+        if e.stderr:
+            msg += f" ({e.stderr.decode(errors='replace').strip().rsplit(chr(10), 1)[-1]})"
+        print(msg, file=sys.stderr)
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+        return False
+    except (subprocess.TimeoutExpired, OSError):
         import sys
         print(
             "Warning: ffmpeg could not merge audio; output is silent.",

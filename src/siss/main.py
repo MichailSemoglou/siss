@@ -16,6 +16,7 @@ a video, while ``.png``/``.jpg``/``.webp`` write a single still image.
 import argparse
 import os
 import sys
+import traceback
 from typing import List, Optional, Tuple
 
 from .colors import get_palette, list_palettes, load_palette_file, parse_color
@@ -243,12 +244,78 @@ def _resolve_colors(
     return color1_rgb, color2_rgb
 
 
+def _validate_args_and_paths(args):
+    """
+    Validate that required args are present and return the resolved input path.
+
+    Creates the output directory if it does not exist.
+
+    Returns
+    -------
+    str
+        Validated input file path.
+
+    Raises
+    ------
+    ValueError
+        If input, output, or --effect is missing.
+    FileNotFoundError
+        If the input path does not exist.
+    """
+    missing = []
+    if not args.input:
+        missing.append("input")
+    if not args.output:
+        missing.append("output")
+    if not args.effect:
+        missing.append("--effect")
+    if missing:
+        raise ValueError(
+            "Missing required argument(s): "
+            + ", ".join(missing)
+            + ". Use --list-palettes to browse palettes."
+        )
+
+    input_path = validate_file_path(args.input, check_exists=True)
+    output_dir = os.path.dirname(args.output)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+    return input_path
+
+
+def _dispatch_effect(args, input_path, color1_rgb, color2_rgb):
+    """
+    Dispatch to the selected effect entry point.
+
+    Each entry point routes to the video or still-image path based on the
+    output file extension.
+    """
+    if args.effect == "duotone":
+        apply_duotone(
+            input_path,
+            args.output,
+            color1_rgb,
+            color2_rgb,
+            no_audio=args.no_audio,
+        )
+    elif args.effect == "halftone":
+        apply_halftone(
+            input_path,
+            args.output,
+            args.symbol_size,
+            color1_rgb,
+            color2_rgb,
+            symbol_type=args.symbol_type,
+            grid_type=args.grid_type,
+            no_audio=args.no_audio,
+        )
+
+
 def main():
     """Main function to process command line arguments and apply video effects."""
     try:
         args = parse_arguments()
 
-        # Load custom palettes early so --list-palettes can show them too.
         custom_palettes = None
         if args.palette_file:
             validate_file_path(args.palette_file, check_exists=True)
@@ -258,59 +325,16 @@ def main():
             print(list_palettes(custom_palettes))
             return 0
 
-        # For any real run we need input, output, and an effect.
-        missing = []
-        if not args.input:
-            missing.append("input")
-        if not args.output:
-            missing.append("output")
-        if not args.effect:
-            missing.append("--effect")
-        if missing:
-            raise ValueError(
-                "Missing required argument(s): "
-                + ", ".join(missing)
-                + ". Use --list-palettes to browse palettes."
-            )
-
-        # Validate input and output paths
-        input_path = validate_file_path(args.input, check_exists=True)
-        output_dir = os.path.dirname(args.output)
-
-        # Create output directory if it doesn't exist
-        if output_dir:
-            os.makedirs(output_dir, exist_ok=True)
-
-        # Resolve colors (palette + explicit overrides + custom palette file).
+        input_path = _validate_args_and_paths(args)
         color1_rgb, color2_rgb = _resolve_colors(args, custom_palettes)
-
-        # Apply the selected effect. Each entry point dispatches to the
-        # video or still-image path based on the output file extension.
-        if args.effect == "duotone":
-            apply_duotone(
-                input_path,
-                args.output,
-                color1_rgb,
-                color2_rgb,
-                no_audio=args.no_audio,
-            )
-        elif args.effect == "halftone":
-            apply_halftone(
-                input_path,
-                args.output,
-                args.symbol_size,
-                color1_rgb,
-                color2_rgb,
-                symbol_type=args.symbol_type,
-                grid_type=args.grid_type,
-                no_audio=args.no_audio,
-            )
+        _dispatch_effect(args, input_path, color1_rgb, color2_rgb)
 
     except (FileNotFoundError, ValueError) as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
     except Exception as e:
         print(f"Unexpected error: {e}", file=sys.stderr)
+        traceback.print_exc()
         return 1
 
     return 0

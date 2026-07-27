@@ -1,31 +1,33 @@
 """
 Unit tests for the duotone module.
 """
-import unittest
 import os
 import tempfile
+import unittest
+
 import cv2
+
 from siss.duotone import apply_duotone, apply_duotone_image
 from tests.helpers import make_gradient_image, make_test_video
 
 
 class TestDuotone(unittest.TestCase):
     """Tests for the duotone effect functions."""
-    
+
     def setUp(self):
         """Set up test environment."""
         # Create a small test video file
         self.temp_dir = tempfile.TemporaryDirectory()
         self.input_path = os.path.join(self.temp_dir.name, "test_input.mp4")
         self.output_path = os.path.join(self.temp_dir.name, "test_output.mp4")
-        
+
         # Create a simple test video (10 frames, gradient color)
         make_test_video(self.input_path, width=320, height=240, frames=10, gradient=True)
-    
+
     def tearDown(self):
         """Clean up test environment."""
         self.temp_dir.cleanup()
-    
+
     def test_apply_duotone_basic(self):
         """Test basic duotone effect application."""
         # Skip test if codec not available
@@ -33,39 +35,39 @@ class TestDuotone(unittest.TestCase):
             # Test with basic colors
             color1 = (255, 0, 0)  # Red
             color2 = (0, 255, 255)  # Cyan
-            
+
             apply_duotone(self.input_path, self.output_path, color1, color2)
-            
+
             # Verify the output exists
             self.assertTrue(os.path.exists(self.output_path))
-            
+
             # Verify the output has correct content
             cap = cv2.VideoCapture(self.output_path)
             self.assertTrue(cap.isOpened())
-            
+
             # Read the first frame and check colors
             ret, frame = cap.read()
             self.assertTrue(ret)
-            
+
             # Check frame dimensions
             self.assertEqual(frame.shape[1], 320)  # Width
             self.assertEqual(frame.shape[0], 240)  # Height
-            
+
             # Close video
             cap.release()
         except cv2.error:
             self.skipTest("Codec not available")
-    
+
     def test_invalid_inputs(self):
         """Test error handling for invalid inputs."""
         # Test with non-existent input file
         with self.assertRaises(FileNotFoundError):
             apply_duotone("nonexistent.mp4", self.output_path, (255, 0, 0), (0, 255, 255))
-        
+
         # Test with invalid colors
         with self.assertRaises(ValueError):
             apply_duotone(self.input_path, self.output_path, (300, 0, 0), (0, 255, 255))
-        
+
         with self.assertRaises(ValueError):
             apply_duotone(self.input_path, self.output_path, (255, 0, 0), (-10, 255, 255))
 

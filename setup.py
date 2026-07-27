@@ -4,7 +4,12 @@ import re
 
 # Single source of truth: read version from src/siss/__init__.py
 _init = (Path(__file__).parent / "src" / "siss" / "__init__.py").read_text()
-__version__ = re.search(r"__version__\s*=\s*['\"]([^'\"]+)['\"]", _init).group(1)
+_match = re.search(r"__version__\s*=\s*['\"]([^'\"]+)['\"]", _init)
+if _match is None:
+    raise RuntimeError(
+        "Could not parse __version__ from src/siss/__init__.py"
+    )
+__version__ = _match.group(1)
 
 # The PyPI long description is maintained in description.md (shipped in the
 # sdist via MANIFEST.in). Fail the build loudly if it is missing rather than
@@ -28,7 +33,7 @@ setup(
         "numpy>=1.20.0",
         "tqdm>=4.60.0",
     ],
-    python_requires=">=3.7",
+    python_requires=">=3.9",
     entry_points={
         "console_scripts": [
             "siss=siss.main:main",
@@ -42,8 +47,6 @@ setup(
         "Topic :: Artistic Software",
         "Operating System :: OS Independent",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.7",
-        "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",

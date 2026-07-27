@@ -16,10 +16,10 @@ from unittest import mock
 import numpy as np
 
 from siss.codec_fix import (
-    get_compatible_codec,
-    validate_codec,
-    get_working_codec,
     create_video_writer,
+    get_compatible_codec,
+    get_working_codec,
+    validate_codec,
 )
 
 

@@ -15,9 +15,9 @@ from argparse import Namespace
 from unittest import mock
 
 from siss.main import (
-    resolve_color_arg,
     _resolve_colors,
     main,
+    resolve_color_arg,
     validate_file_path,
 )
 from siss.utils.video_processing import is_image_file
@@ -315,6 +315,42 @@ class TestMainVideoEffects(unittest.TestCase):
             ):
                 rc = main()
         self.assertEqual(rc, 1)
+
+    def test_no_audio_flag_forwarded_to_duotone(self):
+        with mock.patch("siss.main.apply_duotone") as mock_dt:
+            with mock.patch(
+                "sys.argv",
+                [
+                    "siss",
+                    self.input_path,
+                    self.output_path,
+                    "--effect",
+                    "duotone",
+                    "--no-audio",
+                ],
+            ):
+                rc = main()
+        self.assertEqual(rc, 0)
+        _, kwargs = mock_dt.call_args
+        self.assertTrue(kwargs["no_audio"])
+
+    def test_no_audio_flag_forwarded_to_halftone(self):
+        with mock.patch("siss.main.apply_halftone") as mock_ht:
+            with mock.patch(
+                "sys.argv",
+                [
+                    "siss",
+                    self.input_path,
+                    self.output_path,
+                    "--effect",
+                    "halftone",
+                    "--no-audio",
+                ],
+            ):
+                rc = main()
+        self.assertEqual(rc, 0)
+        _, kwargs = mock_ht.call_args
+        self.assertTrue(kwargs["no_audio"])
 
 
 class TestMainImageEffects(unittest.TestCase):

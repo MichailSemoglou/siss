@@ -33,7 +33,7 @@ def _make_duotone_processor(
     return _duotone_frame
 
 
-def apply_duotone(video_path: str, output_path: str, color1_rgb: Tuple[int, int, int], color2_rgb: Tuple[int, int, int], no_audio: bool = False) -> None:
+def apply_duotone(video_path: str, output_path: str, color1_rgb: Tuple[int, int, int], color2_rgb: Tuple[int, int, int], *, no_audio: bool = False) -> None:
     """
     Apply duotone color effect to a video or still image.
 
@@ -59,11 +59,11 @@ def apply_duotone(video_path: str, output_path: str, color1_rgb: Tuple[int, int,
     )
 
 
-def apply_duotone_image(image_path: str, output_path: str, color1_rgb: Tuple[int, int, int], color2_rgb: Tuple[int, int, int]) -> None:
+def apply_duotone_image(image_path: str, output_path: str, color1_rgb: Tuple[int, int, int], color2_rgb: Tuple[int, int, int], no_audio: bool = False) -> None:
     """
     Apply duotone color effect to a still image.
 
     Kept for backward compatibility: apply_duotone() handles still images
     and videos through the same entry point, so this simply forwards to it.
     """
-    apply_duotone(image_path, output_path, color1_rgb, color2_rgb)
+    apply_duotone(image_path, output_path, color1_rgb, color2_rgb, no_audio=no_audio)

@@ -182,6 +182,7 @@ def apply_halftone(
     symbol_size: int,
     color1_rgb: Tuple[int, int, int],
     color2_rgb: Tuple[int, int, int],
+    *,
     symbol_type: str = 'plus',
     grid_type: str = 'square',
     no_audio: bool = False,
@@ -227,8 +228,10 @@ def apply_halftone_image(
     symbol_size: int,
     color1_rgb: Tuple[int, int, int],
     color2_rgb: Tuple[int, int, int],
+    *,
     symbol_type: str = 'plus',
     grid_type: str = 'square',
+    no_audio: bool = False,
 ) -> None:
     """
     Apply halftone pattern effect to a still image.
@@ -238,7 +241,7 @@ def apply_halftone_image(
     """
     apply_halftone(
         image_path, output_path, symbol_size, color1_rgb, color2_rgb,
-        symbol_type=symbol_type, grid_type=grid_type,
+        symbol_type=symbol_type, grid_type=grid_type, no_audio=no_audio,
     )
 
 

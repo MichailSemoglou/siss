@@ -8,7 +8,7 @@ square or hex-offset screen. Accepts hex strings, CSS named colors, RGB triples,
 and named two-color palettes.
 
 ![GitHub license](https://img.shields.io/github/license/MichailSemoglou/siss)
-![Python version](https://img.shields.io/badge/python-3.7%2B-blue)
+![Python version](https://img.shields.io/badge/python-3.9%2B-blue)
 ![PyPI version](https://img.shields.io/pypi/v/siss)
 [![PyPI Downloads](https://static.pepy.tech/personalized-badge/siss?period=total&units=INTERNATIONAL_SYSTEM&left_color=GREY&right_color=BLUE&left_text=downloads)](https://pepy.tech/projects/siss)
 ![GitHub issues](https://img.shields.io/github/issues/MichailSemoglou/siss)
@@ -216,7 +216,7 @@ siss input.mp4 output.mp4 --effect duotone --palette-file examples/custom-palett
 
 ## Requirements
 
-- Python 3.7+
+- Python 3.9+
 - OpenCV (`cv2`)
 - NumPy
 - tqdm

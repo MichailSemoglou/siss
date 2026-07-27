@@ -6,17 +6,16 @@ Covers:
   - merge_audio(): happy path, no-ffmpeg, no-audio-source, ffmpeg failure
   - process_media(): no_audio flag forwarding and image/video dispatch
   - apply_duotone / apply_halftone: no_audio kwarg forwarding
-  - CLI --no-audio flag: integration with main()
+  - CLI --no-audio flag: integration with main() (in test_main.py)
 """
 import os
 import tempfile
 import unittest
 from unittest import mock
 
-from siss.utils.video_processing import process_media
 from siss.duotone import apply_duotone
 from siss.halftone import apply_halftone
-
+from siss.utils.video_processing import process_media
 
 # ---------------------------------------------------------------------------
 # _has_audio_stream
@@ -99,7 +98,7 @@ class TestMergeAudio(unittest.TestCase):
 
         with mock.patch("siss.audio._has_audio_stream", return_value=True):
             with mock.patch("siss.audio.shutil.which", return_value=None):
-                with mock.patch("sys.stderr") as mock_stderr:
+                with mock.patch("sys.stderr"):
                     result = merge_audio(self.source, self.output)
         self.assertFalse(result)
 
