@@ -12,19 +12,17 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-# Default codec per extension, used on Linux and other platforms. Per-OS
-# overrides are merged on top of this base map.
 _DEFAULT_CODECS = {
     '.avi': 'XVID',
-    '.mp4': 'mp4v',  # DIVX, X264 are also options
+    '.mp4': 'mp4v',
     '.mov': 'mp4v',
     '.mkv': 'X264',
     '.wmv': 'WMV2',
 }
 
 _OS_CODEC_OVERRIDES = {
-    'Windows': {'.mp4': 'H264', '.mov': 'H264', '.mkv': 'H264'},  # DIVX also an option
-    'Darwin': {'.mp4': 'avc1', '.mov': 'avc1', '.mkv': 'avc1'},  # H.264 codec
+    'Windows': {'.mp4': 'H264', '.mov': 'H264', '.mkv': 'H264'},
+    'Darwin': {'.mp4': 'avc1', '.mov': 'avc1', '.mkv': 'avc1'},
 }
 
 
@@ -43,8 +41,6 @@ def get_compatible_codec(output_path: str) -> str:
         **_DEFAULT_CODECS,
         **_OS_CODEC_OVERRIDES.get(platform.system(), {}),
     }
-
-    # Default to a generally compatible codec if extension not found
     return codec_map.get(ext, 'mp4v')
 
 
@@ -103,7 +99,6 @@ def get_working_codec(output_path: str, width: int, height: int, fps: float = 30
     """
     ext = Path(output_path).suffix.lower()
 
-    # Fallback codec options by extension
     fallback_codecs = {
         '.mp4': ['mp4v', 'avc1', 'H264', 'DIVX', 'X264'],
         '.avi': ['XVID', 'MJPG', 'DIVX'],
@@ -112,9 +107,6 @@ def get_working_codec(output_path: str, width: int, height: int, fps: float = 30
         '.wmv': ['WMV2', 'WMV1']
     }
 
-    # Candidates in priority order: the OS-specific primary codec first, then
-    # the extension's fallbacks, with MJPG as a last resort that works on
-    # almost all platforms. Each codec is validated at most once.
     candidates = (
         [get_compatible_codec(output_path)]
         + fallback_codecs.get(ext, ['mp4v', 'XVID', 'MJPG'])
@@ -148,10 +140,8 @@ def create_video_writer(output_path: str, fps: float, width: int, height: int) -
     Raises:
         RuntimeError: If no compatible codec is found
     """
-    # Try to find a working codec
     codec = get_working_codec(output_path, width, height, fps)
 
-    # Create writer with the codec
     fourcc = cv2.VideoWriter_fourcc(*codec)  # type: ignore[attr-defined]
     writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 

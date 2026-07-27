@@ -24,12 +24,11 @@ def _make_duotone_processor(
 
     def _duotone_frame(frame):
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        h, w = gray.shape[:2]
-        duotone = np.zeros((h, w, 3), dtype=np.uint8)
-        normalized = gray.astype(float) / 255.0
-        for i in range(3):
-            duotone[:, :, i] = (1 - normalized) * color1[i] + normalized * color2[i]
-        return duotone.astype(np.uint8)
+        normalized = gray.astype(np.float32)[:, :, np.newaxis] / 255.0
+        color1_arr = np.asarray(color1, dtype=np.float32)
+        color2_arr = np.asarray(color2, dtype=np.float32)
+        duotone = (1 - normalized) * color1_arr + normalized * color2_arr
+        return np.round(duotone).astype(np.uint8)
 
     return _duotone_frame
 

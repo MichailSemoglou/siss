@@ -5,6 +5,20 @@ All notable changes to the Siss project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] - 2026-07-27
+
+### Changed
+
+- The duotone processor now blends the two colors in a single vectorized operation (`src/siss/duotone.py`). The per-channel Python loop is replaced by a NumPy broadcast, and the float-to-uint8 cast uses `np.round` instead of truncation, removing a systematic dark bias of up to 1 LSB per channel.
+- `--symbol-size`, `--symbol-type`, and `--grid-type` are now the primary CLI flags for the halftone effect (`src/siss/main.py`). The previous underscore variants (`--symbol_size` and so on) remain as hidden aliases, so existing scripts and muscle memory are not broken.
+
+### Fixed
+
+- The audio merge step in `src/siss/audio.py` now creates the temporary file next to the output path rather than in the system temp directory. On macOS and other platforms where a user-chosen output resides on a different volume from `/tmp`, `os.replace` no longer fails with a cross-device link error and the rendered audio is not lost.
+- `process_video_frames` in `src/siss/utils/video_processing.py` raises `ValueError` before writer construction when the input video reports degenerate dimensions (`width <= 0` or `height <= 0`) or a non-positive frame count. A `(0, 0)` writer is no longer silently accepted.
+- Each processed frame is checked against the writer's configured dimensions in `process_video_frames`. When OpenCV yields a frame whose shape diverges from the reported properties (observed with certain transcoders and rotated metadata), the frame is resized to match before writing rather than producing a corrupt packet.
+- The halftone edge predicate for `asterisk` and `slash` symbols in `src/siss/halftone.py` now covers all four sides of the frame. Symbols whose strokes overflow the top or left edge are routed through the same clamped `cv2.line` drawer as bottom and right edges, producing symmetric results instead of silently dropping out-of-bounds pixels.
+
 ## [0.7.0] - 2026-07-26
 
 ### Added

@@ -64,7 +64,9 @@ def merge_audio(source_path: str, output_path: str) -> bool:
         return False
 
     tmp_fd, tmp_path = tempfile.mkstemp(
-        suffix=os.path.splitext(output_path)[1], prefix=".siss_audio_"
+        suffix=os.path.splitext(output_path)[1],
+        prefix=".siss_audio_",
+        dir=os.path.dirname(output_path) or ".",
     )
     os.close(tmp_fd)
 

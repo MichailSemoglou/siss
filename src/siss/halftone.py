@@ -114,7 +114,7 @@ def _draw_symbols(halftone: np.ndarray, symbol_type: str, cx: np.ndarray, cy: np
         x = cx[sel]
         y = cy[sel]
         if symbol_type in ('asterisk', 'slash'):
-            edge = (x + size >= w) | (y + size >= h)
+            edge = (x + size >= w) | (y + size >= h) | (x - size < 0) | (y - size < 0)
             if edge.any():
                 draw_edge = _EDGE_DRAWERS[symbol_type]
                 for ex, ey in zip(x[edge], y[edge]):

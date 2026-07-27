@@ -161,25 +161,31 @@ def parse_arguments():
     )
 
     parser.add_argument(
+        "--symbol-size",
         "--symbol_size",
         type=int,
         default=10,
+        dest="symbol_size",
         help="Size of the largest symbol in the halftone effect",
     )
 
     parser.add_argument(
+        "--symbol-type",
         "--symbol_type",
         type=str,
         choices=["plus", "asterisk", "slash", "dot"],
         default="plus",
+        dest="symbol_type",
         help="Symbol type for halftone effect",
     )
 
     parser.add_argument(
+        "--grid-type",
         "--grid_type",
         type=str,
         choices=["square", "hex"],
         default="square",
+        dest="grid_type",
         help=(
             "Sampling grid for halftone effect. 'hex' staggers alternating "
             "rows by half a step, giving the interlocking dot screen of a "

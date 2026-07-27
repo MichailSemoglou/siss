@@ -132,8 +132,17 @@ def process_video_frames(video_path: str, output_path: str, process_function: Ca
 
     try:
         props = get_video_properties(cap)
+        width, height = props['width'], props['height']
+        if width <= 0 or height <= 0:
+            raise ValueError(
+                f"Video has degenerate dimensions ({width}x{height}); cannot write output"
+            )
+        if props['frame_count'] <= 0:
+            raise ValueError(
+                "Video reports zero or unknown frame count; cannot process"
+            )
         out = create_video_writer(
-            output_path, props['fps'], props['width'], props['height']
+            output_path, props['fps'], width, height
         )
 
         progress_bar = tqdm(total=props['frame_count'], desc="Processing frames")
@@ -144,6 +153,11 @@ def process_video_frames(video_path: str, output_path: str, process_function: Ca
                 break
 
             processed_frame = process_function(frame, **kwargs)
+            if processed_frame.shape[:2] != (height, width):
+                processed_frame = cv2.resize(
+                    processed_frame, (width, height),
+                    interpolation=cv2.INTER_LINEAR,
+                )
             out.write(processed_frame)
             progress_bar.update(1)
 
