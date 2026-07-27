@@ -1,2 +1,4 @@
+mypy>=1.0
 pytest>=6.2.5
+ruff>=0.4
 setuptools>=42.0.0
