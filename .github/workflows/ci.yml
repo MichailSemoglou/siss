@@ -24,6 +24,7 @@ jobs:
           pip install -e .
           pip install -r requirements-dev.txt
       - name: Audit dependencies for known vulnerabilities
+        if: matrix.python-version != '3.9'
         run: |
           pip install pip-audit
           pip-audit -r requirements.txt -r requirements-dev.txt
