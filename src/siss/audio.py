@@ -21,11 +21,12 @@ import os
 import shutil
 import subprocess
 import tempfile
+from typing import Optional
 
 _log = logging.getLogger(__name__)
 
 
-def _find_ffprobe() -> str | None:
+def _find_ffprobe() -> Optional[str]:
     """Return the ffprobe executable path.
 
     Checks ``SISS_FFPROBE`` first, then falls back to PATH.
@@ -33,7 +34,7 @@ def _find_ffprobe() -> str | None:
     return os.environ.get("SISS_FFPROBE") or shutil.which("ffprobe")
 
 
-def _find_ffmpeg() -> str | None:
+def _find_ffmpeg() -> Optional[str]:
     """Return the ffmpeg executable path.
 
     Checks ``SISS_FFMPEG`` first, then falls back to PATH.
