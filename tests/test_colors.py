@@ -8,6 +8,7 @@ import unittest
 
 from siss.colors import (
     PALETTES,
+    export_palette_preview,
     get_palette,
     list_palettes,
     load_palette_file,
@@ -238,6 +239,19 @@ class TestLoadPaletteFile(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             load_palette_file(os.path.join(self.tmp.name, "nonexistent.json"))
 
+    def test_name_too_long_raises(self):
+        long_name = "a" * 65
+        path = self._write("p.json", {long_name: {"color1": "#ff0000", "color2": "#0000ff"}})
+        with self.assertRaises(ValueError) as ctx:
+            load_palette_file(path)
+        self.assertIn("65 characters", str(ctx.exception))
+
+    def test_name_at_limit_is_accepted(self):
+        exact_name = "b" * 64
+        path = self._write("p.json", {exact_name: {"color1": "#ff0000", "color2": "#0000ff"}})
+        palettes = load_palette_file(path)
+        self.assertIn(exact_name, palettes)
+
 
 class TestCustomPalettesIntegration(unittest.TestCase):
     """Tests for get_palette() and list_palettes() with custom palettes."""
@@ -323,6 +337,87 @@ class TestValidateRgb(unittest.TestCase):
             validate_rgb(5)
         with self.assertRaises(ValueError):
             validate_rgb(None)
+
+
+class TestExportPalettePreview(unittest.TestCase):
+    """Tests for the palette preview contact-sheet renderer."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.output_path = os.path.join(self.tmp.name, "preview.png")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_preview_renders_png(self):
+        export_palette_preview(self.output_path)
+        self.assertTrue(os.path.isfile(self.output_path))
+        self.assertGreater(os.path.getsize(self.output_path), 0)
+
+    def test_preview_with_no_custom_palettes(self):
+        export_palette_preview(self.output_path, custom_palettes=None)
+        self.assertTrue(os.path.isfile(self.output_path))
+
+    def test_preview_includes_custom_palettes(self):
+        custom = {
+            "brand": ((10, 20, 30), (40, 50, 60)),
+            "test": ((200, 200, 200), (50, 50, 50)),
+        }
+        export_palette_preview(self.output_path, custom_palettes=custom)
+        self.assertTrue(os.path.isfile(self.output_path))
+
+    def test_preview_skips_builtin_shadowed_by_custom(self):
+        custom = {"sunset": ((0, 0, 0), (255, 255, 255))}
+        export_palette_preview(self.output_path, custom_palettes=custom)
+        self.assertTrue(os.path.isfile(self.output_path))
+
+
+class TestLoadPaletteFileSizeLimit(unittest.TestCase):
+    """Tests for the 1 MiB file-size guard in load_palette_file."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.path = os.path.join(self.tmp.name, "palettes.json")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_file_at_limit_is_accepted(self):
+        name = "a"
+        c1_hex = '"#000"'
+        c2_hex = '"#fff"'
+        obj = f'{{"{name}":{{"color1":{c1_hex},"color2":{c2_hex}}}}}'
+        content = obj.encode()
+        padding_len = 1 * 1024 * 1024 - len(content)
+        if padding_len < 0:
+            self.skipTest("JSON content exceeds size limit; cannot construct boundary test")
+        with open(self.path, "wb") as f:
+            f.write(content)
+            if padding_len > 0:
+                f.write(b"\n" + b" " * (padding_len - 1))
+        self.assertEqual(os.path.getsize(self.path), 1 * 1024 * 1024)
+        result = load_palette_file(self.path)
+        self.assertIn(name, result)
+        self.assertEqual(result[name], ((0, 0, 0), (255, 255, 255)))
+
+    def test_file_one_byte_over_limit_raises(self):
+        with open(self.path, "wb") as f:
+            f.write(b" " * (1 * 1024 * 1024 + 1))
+        with self.assertRaises(ValueError) as ctx:
+            load_palette_file(self.path)
+        self.assertIn("1 MiB", str(ctx.exception))
+
+    def test_small_valid_file_is_accepted(self):
+        with open(self.path, "w") as f:
+            json.dump({"p": {"color1": "#ff0000", "color2": "#0000ff"}}, f)
+        result = load_palette_file(self.path)
+        self.assertIn("p", result)
+
+    def test_empty_file_is_accepted(self):
+        with open(self.path, "w") as f:
+            f.write("{}")
+        result = load_palette_file(self.path)
+        self.assertEqual(result, {})
 
 
 if __name__ == "__main__":

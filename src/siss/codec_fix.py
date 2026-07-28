@@ -4,6 +4,7 @@ Module for fixing codec issues in OpenCV video writing.
 This module provides functions to address common codec issues when writing
 videos with OpenCV, particularly on different operating systems.
 """
+import logging
 import os
 import platform
 import tempfile
@@ -11,6 +12,8 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+
+_log = logging.getLogger(__name__)
 
 _DEFAULT_CODECS = {
     '.avi': 'XVID',
@@ -73,6 +76,7 @@ def validate_codec(codec: str, width: int, height: int, fps: float = 30.0, ext: 
             writer.release()
         return os.path.exists(temp_path) and os.path.getsize(temp_path) > 0
     except Exception:
+        _log.debug("Codec probe %r failed, skipping", codec)
         return False
     finally:
         if os.path.exists(temp_path):

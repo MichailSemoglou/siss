@@ -11,6 +11,13 @@ if _match is None:
     )
 __version__ = _match.group(1)
 
+# This package uses setup.py with setuptools rather than a PEP 621 [project]
+# table in pyproject.toml. The decision is deliberate: setup.py keeps the
+# version string discoverable at build time from src/siss/__init__.py, and
+# the current toolchain (mypy, pytest-cov, ruff) works without the extra
+# indirection. A migration to PEP 621 is possible but offers no immediate
+# gain while adding a maintenance burden for the dynamic-version dance.
+#
 # The PyPI long description is maintained in description.md (shipped in the
 # sdist via MANIFEST.in). Fail the build loudly if it is missing rather than
 # falling back to a second, drifting copy.
@@ -23,15 +30,16 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="Michail Semoglou",
-    author_email="m.semoglou@qide.studio",
+    author_email="m.semoglou@tongji.edu.cn",
     url="https://github.com/MichailSemoglou/siss",
     license="MIT",
-    packages=["siss", "siss.utils"],
+    packages=["siss", "siss.colors", "siss.utils"],
     package_dir={"": "src"},
     install_requires=[
-        "opencv-python>=4.5.0",
+        "opencv-python>=4.10.0",
         "numpy>=1.20.0",
         "tqdm>=4.60.0",
+        "Pillow>=11.0.0",
     ],
     python_requires=">=3.9",
     entry_points={

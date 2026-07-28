@@ -14,12 +14,18 @@ Output format is chosen from the output path extension: ``.mp4``/``.mov`` write
 a video, while ``.png``/``.jpg``/``.webp`` write a single still image.
 """
 import argparse
+import logging
 import os
 import sys
-import traceback
 from typing import List, Optional, Tuple
 
-from .colors import get_palette, list_palettes, load_palette_file, parse_color
+from .colors import (
+    export_palette_preview,
+    get_palette,
+    list_palettes,
+    load_palette_file,
+    parse_color,
+)
 from .duotone import apply_duotone
 from .halftone import apply_halftone
 
@@ -162,6 +168,14 @@ def parse_arguments():
     )
 
     parser.add_argument(
+        "--export-palette-preview",
+        type=str,
+        default=None,
+        metavar="PATH",
+        help="Render a PNG contact sheet of every palette and save it to PATH.",
+    )
+
+    parser.add_argument(
         "--symbol-size",
         "--symbol_size",
         type=int,
@@ -201,6 +215,41 @@ def parse_arguments():
             "Skip merging the original audio track into the output video. "
             "By default, Siss copies audio from the source with ffmpeg "
             "after rendering."
+        ),
+    )
+
+    parser.add_argument(
+        "--verbose",
+        "-v",
+        action="count",
+        default=0,
+        help=(
+            "Increase log verbosity. Use -v for INFO, -vv for DEBUG. "
+            "Without --verbose, only warnings and errors are shown."
+        ),
+    )
+
+    parser.add_argument(
+        "--quiet",
+        "-q",
+        action="store_true",
+        default=False,
+        help=(
+            "Suppress informational output, progress bars, and logs below "
+            "ERROR level. The final result-path line is still printed."
+        ),
+    )
+
+    parser.add_argument(
+        "--split-view",
+        type=str,
+        choices=["vertical", "horizontal"],
+        default=None,
+        metavar="DIRECTION",
+        help=(
+            "Export a before/after comparison: vertical (left/right) or "
+            "horizontal (top/bottom). Works with any input orientation "
+            "including portrait and 9:16 vertical video."
         ),
     )
 
@@ -290,6 +339,7 @@ def _dispatch_effect(args, input_path, color1_rgb, color2_rgb):
     Each entry point routes to the video or still-image path based on the
     output file extension.
     """
+    split_direction = getattr(args, "split_view", None)
     if args.effect == "duotone":
         apply_duotone(
             input_path,
@@ -297,6 +347,7 @@ def _dispatch_effect(args, input_path, color1_rgb, color2_rgb):
             color1_rgb,
             color2_rgb,
             no_audio=args.no_audio,
+            split_direction=split_direction,
         )
     elif args.effect == "halftone":
         apply_halftone(
@@ -308,14 +359,37 @@ def _dispatch_effect(args, input_path, color1_rgb, color2_rgb):
             symbol_type=args.symbol_type,
             grid_type=args.grid_type,
             no_audio=args.no_audio,
+            split_direction=split_direction,
         )
+
+
+def _configure_logging(args) -> None:
+    """Set up structured logging based on --verbose and --quiet flags."""
+    if args.quiet:
+        level = logging.ERROR
+    elif args.verbose >= 2:
+        level = logging.DEBUG
+    elif args.verbose == 1:
+        level = logging.INFO
+    else:
+        level = logging.WARNING
+
+    logging.basicConfig(
+        format="%(asctime)s [%(levelname)-7s] %(name)s: %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S",
+        level=level,
+        stream=sys.stderr,
+    )
 
 
 def main():
     """Main function to process command line arguments and apply video effects."""
-    try:
-        args = parse_arguments()
+    args = parse_arguments()
+    _configure_logging(args)
 
+    logger = logging.getLogger(__name__)
+
+    try:
         custom_palettes = None
         if args.palette_file:
             validate_file_path(args.palette_file, check_exists=True)
@@ -325,16 +399,31 @@ def main():
             print(list_palettes(custom_palettes))
             return 0
 
+        if args.export_palette_preview:
+            export_palette_preview(args.export_palette_preview, custom_palettes)
+            return 0
+
         input_path = _validate_args_and_paths(args)
         color1_rgb, color2_rgb = _resolve_colors(args, custom_palettes)
         _dispatch_effect(args, input_path, color1_rgb, color2_rgb)
 
-    except (FileNotFoundError, ValueError) as e:
-        print(f"Error: {e}", file=sys.stderr)
+    except FileNotFoundError as e:
+        logger.error("%s", e)
         return 1
-    except Exception as e:
-        print(f"Unexpected error: {e}", file=sys.stderr)
-        traceback.print_exc()
+    except ValueError as e:
+        logger.error("%s", e)
+        return 1
+    except RuntimeError as e:
+        logger.error("%s", e)
+        return 1
+    except Exception:
+        if logger.getEffectiveLevel() <= logging.DEBUG:
+            logger.exception("Unexpected error")
+        else:
+            logger.error(
+                "An unexpected error occurred. "
+                "Re-run with -vv for the full traceback."
+            )
         return 1
 
     return 0

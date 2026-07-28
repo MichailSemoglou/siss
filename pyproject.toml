@@ -16,6 +16,9 @@ select = ["E", "F", "I", "W"]
 ignore = ["E501"]
 
 [tool.mypy]
+# Mypy targets 3.12 for numpy stub compatibility; the package itself supports
+# Python >=3.9 (see setup.py `python_requires`). A future numpy release that
+# ships 3.9-compatible stubs may allow this to move back to 3.9.
 python_version = "3.12"
 ignore_missing_imports = true
 files = ["src/siss"]

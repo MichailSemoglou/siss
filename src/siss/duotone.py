@@ -1,7 +1,7 @@
 """
 Module for applying duotone color effects to videos and still images.
 """
-from typing import Callable, Tuple
+from typing import Callable, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -22,7 +22,7 @@ def _make_duotone_processor(
     color1 = validate_rgb(color1_rgb)[::-1]
     color2 = validate_rgb(color2_rgb)[::-1]
 
-    def _duotone_frame(frame):
+    def _duotone_frame(frame: np.ndarray) -> np.ndarray:
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         normalized = gray.astype(np.float32)[:, :, np.newaxis] / 255.0
         color1_arr = np.asarray(color1, dtype=np.float32)
@@ -33,7 +33,7 @@ def _make_duotone_processor(
     return _duotone_frame
 
 
-def apply_duotone(video_path: str, output_path: str, color1_rgb: Tuple[int, int, int], color2_rgb: Tuple[int, int, int], *, no_audio: bool = False) -> None:
+def apply_duotone(video_path: str, output_path: str, color1_rgb: Tuple[int, int, int], color2_rgb: Tuple[int, int, int], *, no_audio: bool = False, split_direction: Optional[str] = None) -> None:
     """
     Apply duotone color effect to a video or still image.
 
@@ -56,14 +56,15 @@ def apply_duotone(video_path: str, output_path: str, color1_rgb: Tuple[int, int,
         video_path, output_path,
         _make_duotone_processor(color1_rgb, color2_rgb),
         no_audio=no_audio,
+        split_direction=split_direction,
     )
 
 
-def apply_duotone_image(image_path: str, output_path: str, color1_rgb: Tuple[int, int, int], color2_rgb: Tuple[int, int, int], no_audio: bool = False) -> None:
+def apply_duotone_image(image_path: str, output_path: str, color1_rgb: Tuple[int, int, int], color2_rgb: Tuple[int, int, int], *, no_audio: bool = False, split_direction: Optional[str] = None) -> None:
     """
     Apply duotone color effect to a still image.
 
     Kept for backward compatibility: apply_duotone() handles still images
     and videos through the same entry point, so this simply forwards to it.
     """
-    apply_duotone(image_path, output_path, color1_rgb, color2_rgb, no_audio=no_audio)
+    apply_duotone(image_path, output_path, color1_rgb, color2_rgb, no_audio=no_audio, split_direction=split_direction)

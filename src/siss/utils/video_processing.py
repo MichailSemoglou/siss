@@ -4,14 +4,17 @@ Utility functions for video processing operations.
 This module provides helper functions for common video operations like
 loading videos and saving processed results.
 """
+import logging
 import os
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Optional
 
 import cv2
 import numpy as np
 from tqdm import tqdm
 
 from ..codec_fix import create_video_writer
+
+_log = logging.getLogger(__name__)
 
 
 def load_video(video_path: str) -> cv2.VideoCapture:
@@ -78,6 +81,14 @@ def is_image_file(file_path: str) -> bool:
     return os.path.splitext(file_path)[1].lower() in IMAGE_EXTENSIONS
 
 
+def _validate_split_direction(split_direction: Optional[str]) -> None:
+    """Raise ValueError for unsupported split_direction values."""
+    if split_direction is not None and split_direction not in ("vertical", "horizontal"):
+        raise ValueError(
+            f"split_direction must be 'vertical', 'horizontal', or None; got {split_direction!r}"
+        )
+
+
 def process_image(image_path: str, output_path: str, process_function: Callable[..., Any], **kwargs: Any) -> None:
     """
     Process a still image by applying a function to it.
@@ -102,14 +113,21 @@ def process_image(image_path: str, output_path: str, process_function: Callable[
     if frame is None:
         raise FileNotFoundError(f"Cannot open image file: {image_path}")
 
+    split = kwargs.pop("split_direction", None)
+    _validate_split_direction(split)
     processed_frame = process_function(frame, **kwargs)
+    if split:
+        axis = 1 if split == "vertical" else 0
+        processed_frame = np.concatenate(
+            (frame, processed_frame), axis=axis
+        )
     success = cv2.imwrite(output_path, processed_frame)
     if not success:
         raise RuntimeError(f"Failed to write image file: {output_path}")
     print(f"Processed image saved to {output_path}")
 
 
-def process_video_frames(video_path: str, output_path: str, process_function: Callable[..., Any], **kwargs: Any) -> None:
+def process_video_frames(video_path: str, output_path: str, process_function: Callable[..., Any], split_direction: Optional[str] = None, **kwargs: Any) -> None:
     """
     Process a video by applying a function to each frame.
 
@@ -126,6 +144,7 @@ def process_video_frames(video_path: str, output_path: str, process_function: Ca
 
         process_video_frames('input.mp4', 'output.mp4', grayscale)
     """
+    _validate_split_direction(split_direction)
     cap = load_video(video_path)
     out = None
     progress_bar = None
@@ -141,11 +160,23 @@ def process_video_frames(video_path: str, output_path: str, process_function: Ca
             raise ValueError(
                 "Video reports zero or unknown frame count; cannot process"
             )
+
+        out_width, out_height = width, height
+        if split_direction == "vertical":
+            out_width = width * 2
+        elif split_direction == "horizontal":
+            out_height = height * 2
+
         out = create_video_writer(
-            output_path, props['fps'], width, height
+            output_path, props['fps'], out_width, out_height
         )
 
-        progress_bar = tqdm(total=props['frame_count'], desc="Processing frames")
+        quiet = logging.getLogger().getEffectiveLevel() >= logging.ERROR
+        progress_bar = tqdm(
+            total=props['frame_count'],
+            desc="Processing frames",
+            disable=quiet,
+        )
 
         while True:
             ret, frame = cap.read()
@@ -157,6 +188,11 @@ def process_video_frames(video_path: str, output_path: str, process_function: Ca
                 processed_frame = cv2.resize(
                     processed_frame, (width, height),
                     interpolation=cv2.INTER_LINEAR,
+                )
+            if split_direction:
+                axis = 1 if split_direction == "vertical" else 0
+                processed_frame = np.concatenate(
+                    (frame, processed_frame), axis=axis
                 )
             out.write(processed_frame)
             progress_bar.update(1)
@@ -193,7 +229,8 @@ def process_media(input_path: str, output_path: str, process_function: Callable[
     """
     if is_image_file(output_path):
         return process_image(input_path, output_path, process_function, **kwargs)
-    process_video_frames(input_path, output_path, process_function, **kwargs)
+    split = kwargs.pop("split_direction", None)
+    process_video_frames(input_path, output_path, process_function, split_direction=split, **kwargs)
     if not no_audio:
         from ..audio import merge_audio
         merge_audio(input_path, output_path)

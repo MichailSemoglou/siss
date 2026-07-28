@@ -23,9 +23,13 @@ jobs:
           pip install --upgrade pip
           pip install -e .
           pip install -r requirements-dev.txt
+      - name: Audit dependencies for known vulnerabilities
+        run: |
+          pip install pip-audit
+          pip-audit
       - name: Ruff check
         run: ruff check src/ tests/
       - name: Mypy
         run: mypy
-      - name: Pytest
-        run: pytest
+      - name: Pytest with coverage
+        run: pytest --cov=siss --cov-report=term --cov-report=xml --cov-fail-under=60

@@ -1,7 +1,7 @@
 """
 Module for applying halftone pattern effects to videos and still images.
 """
-from typing import Callable, Dict, Tuple
+from typing import Callable, Dict, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -17,8 +17,7 @@ def _make_halftone_processor(
     symbol_type: str = 'plus',
     grid_type: str = 'square',
 ) -> Callable[[np.ndarray], np.ndarray]:
-    """
-    Build and return the per-frame closure used by both video and image paths.
+    """Build and return the per-frame closure used by both video and image paths.
 
     Validates the input parameters and returns a callable that maps a BGR frame
     to a halftone BGR frame using the two RGB colors.
@@ -28,19 +27,13 @@ def _make_halftone_processor(
 
     if symbol_type not in ['plus', 'asterisk', 'slash', 'dot']:
         raise ValueError("Symbol type must be 'plus', 'asterisk', 'slash', or 'dot'")
-
     if grid_type not in ['square', 'hex']:
         raise ValueError("Grid type must be 'square' or 'hex'")
-
     if symbol_size <= 0:
         raise ValueError("Symbol size must be greater than 0")
 
-    def _halftone_frame(frame):
+    def _halftone_frame(frame: np.ndarray) -> np.ndarray:
         h, w = frame.shape[:2]
-
-        # Grid density scales with frame width: the largest symbol is at
-        # most 1/20th of the width.  The minimum sampling step is 4 px so
-        # that single-pixel or blank frames still produce a visible grid.
         adjusted = min(symbol_size, w // 20)
         step = max(adjusted // 2, 4)
         half = step // 2
@@ -49,11 +42,8 @@ def _make_halftone_processor(
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         halftone = np.full((h, w), 255, dtype=np.uint8)
 
-        # Mean luminance of the 3x3 region at every grid point, computed in
-        # one pass from the integral image instead of a per-cell Python loop.
         integral = cv2.integral(gray, sdepth=cv2.CV_64F)
 
-        # On a hex grid, odd rows shift right by half a step.
         ys = np.arange(0, h, step)
         even_xs = np.arange(0, w, step)
         odd_xs = np.arange(half, w, step) if grid_type == 'hex' else even_xs
@@ -61,10 +51,8 @@ def _make_halftone_processor(
         for block_ys, block_xs in ((ys[0::2], even_xs), (ys[1::2], odd_xs)):
             if block_ys.size == 0 or block_xs.size == 0:
                 continue
-
             means = _grid_means(integral, block_ys, block_xs, h, w)
             sizes = (max_size * (1.0 - means / 255.0)).astype(np.intp)
-
             cx = block_xs + half
             cy = block_ys + half
             keep = (sizes > 0) & (cx < w) & (cy[:, np.newaxis] < h)
@@ -104,10 +92,12 @@ def _draw_symbols(halftone: np.ndarray, symbol_type: str, cx: np.ndarray, cy: np
 
     Each size group is drawn with vectorized index operations. The diagonal
     strokes of asterisk and slash symbols in cells touching the right or
-    bottom edge are drawn per cell with OpenCV instead: the former renderer
+    bottom edge are drawn per cell with OpenCV instead of the former renderer
     clamps those line endpoints to the frame, and a clamped Bresenham line is
     not pixel-identical to a clipped 45-degree diagonal.
     """
+    if sizes.size == 0:
+        return
     h, w = halftone.shape
     for size in np.unique(sizes):
         sel = sizes == size
@@ -186,6 +176,7 @@ def apply_halftone(
     symbol_type: str = 'plus',
     grid_type: str = 'square',
     no_audio: bool = False,
+    split_direction: Optional[str] = None,
 ) -> None:
     """
     Apply halftone pattern effect to a video or still image.
@@ -219,6 +210,7 @@ def apply_halftone(
             symbol_type=symbol_type, grid_type=grid_type,
         ),
         no_audio=no_audio,
+        split_direction=split_direction,
     )
 
 
@@ -232,6 +224,7 @@ def apply_halftone_image(
     symbol_type: str = 'plus',
     grid_type: str = 'square',
     no_audio: bool = False,
+    split_direction: Optional[str] = None,
 ) -> None:
     """
     Apply halftone pattern effect to a still image.
@@ -240,8 +233,15 @@ def apply_halftone_image(
     and videos through the same entry point, so this simply forwards to it.
     """
     apply_halftone(
-        image_path, output_path, symbol_size, color1_rgb, color2_rgb,
-        symbol_type=symbol_type, grid_type=grid_type, no_audio=no_audio,
+        image_path,
+        output_path,
+        symbol_size,
+        color1_rgb,
+        color2_rgb,
+        symbol_type=symbol_type,
+        grid_type=grid_type,
+        no_audio=no_audio,
+        split_direction=split_direction,
     )
 
 

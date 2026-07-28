@@ -14,6 +14,8 @@ and named two-color palettes.
 ![GitHub issues](https://img.shields.io/github/issues/MichailSemoglou/siss)
 ![GitHub last commit](https://img.shields.io/github/last-commit/MichailSemoglou/siss)
 
+![siss demo](examples/demo.gif)
+
 ## Features
 
 - **Duotone** – maps per-pixel luminance to a linear gradient between two RGB colors; `color1` is applied to dark areas, `color2` to light areas
@@ -163,6 +165,9 @@ Codec selection for video output is **automatic** — the tool probes available 
 - `--grid_type` – halftone sampling grid: `square` or `hex` (default: `square`); `hex` staggers alternating rows by half a step for a traditional print-halftone dot screen
 - `--no-audio` – skip merging the original audio track into the output video (default: merge audio when `ffmpeg` is available)
 - `--palette-file` – path to a JSON file of custom palettes; each entry must have `"color1"` and `"color2"` keys in the same formats as `--color1`/`--color2`. Custom names override built-in ones.
+- `--export-palette-preview` – render a PNG contact sheet of every palette as labeled swatch pairs and save it to the given path; useful for design reviews
+- `--split-view` – export a before/after comparison: `vertical` places original left and processed right; `horizontal` places original above and processed below. Works with any input orientation including portrait and 9:16 vertical video
+- `--verbose` (`-v`) / `--quiet` (`-q`) – control log output verbosity; `-v` for INFO, `-vv` for DEBUG, `-q` for ERROR only
 
 ## Examples
 
@@ -202,12 +207,27 @@ Load custom palettes from a file:
 siss input.mp4 output.mp4 --effect duotone --palette-file examples/custom-palettes.json --palette brand-warm
 ```
 
+Before/after split view:
+
+```bash
+siss input.jpg side_by_side.jpg --effect duotone --palette sunset --split-view vertical
+```
+
+Export a palette contact sheet:
+
+```bash
+siss --export-palette-preview palettes.png
+```
+
 ## Project Structure
 
 - `src/siss/`
   - `main.py` – command-line interface and argument parsing
   - `audio.py` – ffmpeg audio-track passthrough for video output
-  - `colors.py` – hex, CSS name, and RGB parsing; curated palette registry; custom palette file loading
+  - `colors/`
+    - `_parse.py` – hex, CSS name, and RGB color parsing and validation
+    - `_palettes.py` – curated palette registry and JSON palette-file loading
+    - `_preview.py` – palette contact-sheet renderer with system font discovery
   - `duotone.py` – per-frame luminance-to-gradient mapping
   - `halftone.py` – per-frame symbol rendering at luminance-proportional sizes
   - `codec_fix.py` – adaptive `cv2.VideoWriter_fourcc` selection per OS and format
@@ -219,8 +239,12 @@ siss input.mp4 output.mp4 --effect duotone --palette-file examples/custom-palett
 - Python 3.9+
 - OpenCV (`cv2`)
 - NumPy
+- Pillow
 - tqdm
 - ffmpeg (optional — for audio passthrough in video output)
+
+Siss runs on macOS, Linux, and Windows. Codec selection is automatic and
+per-OS, so no platform-specific flags are needed.
 
 ## Troubleshooting
 
@@ -240,15 +264,8 @@ Frames are processed sequentially to keep memory use bounded. For large inputs:
 
 ## Contributing
 
-To contribute:
-
-1. Fork the repository.
-2. Install the development dependencies: optionally `pip install -e .` for an editable install, then `pip install -r requirements-dev.txt`.
-3. Run the test suite: `pytest`.
-4. Create a feature branch: `git checkout -b feature/short-description`.
-5. Commit your changes: `git commit -m 'Add halftone slash rendering'`.
-6. Push to the branch: `git push origin feature/short-description`.
-7. Open a pull request describing what changed and why.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, the commit-message
+convention, and the pull request checklist.
 
 ## Changelog
 

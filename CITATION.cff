@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: "If you use Siss in your work, please cite it as below."
+title: Siss
+abstract: "A command-line tool for applying duotone and halftone effects to video and still-image files."
+authors:
+  - given-names: Michail
+    family-names: Semoglou
+    email: m.semoglou@tongji.edu.cn
+    affiliation: "College of Design and Innovation, Tongji University"
+repository-code: "https://github.com/MichailSemoglou/siss"
+url: "https://github.com/MichailSemoglou/siss"
+license: MIT
+version: 0.8.0
+date-released: 2026-07-28

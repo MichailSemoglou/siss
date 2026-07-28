@@ -5,6 +5,49 @@ All notable changes to the Siss project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-07-28
+
+### Added
+
+- Unit tests for internal core algorithmic functions `_grid_means`, `_draw_symbols`, and `_duotone_frame` in `tests/test_core_algorithms_pytest.py`. Coverage includes all four symbol types (plus, dot, asterisk, slash), known integral-image inputs, and pixel-level assertions for duotone interpolation.
+- `--verbose` (`-v`/`-vv`) and `--quiet` (`-q`) CLI flags for controlling log output verbosity.
+- Structured logging via Python's `logging` module with ISO-8601 timestamps, severity levels, and module-qualified names. Output goes to stderr; the result-path line stays on stdout for downstream scripts.
+- Tests for log-level configuration, `--verbose`/`--quiet` flag acceptance, and exception-handling paths in `tests/test_main.py`.
+- `--export-palette-preview` flag that renders an A4-landscape PNG contact sheet of every palette as labeled swatch pairs with HEX and RGB values in a system monospaced font at 12pt.
+- `--split-view` flag (`vertical` or `horizontal`) for exporting before/after comparison outputs. Vertical places original left and processed right; horizontal places original above. Works with any input orientation including portrait and 9:16 vertical video.
+- Hash-pinned dependency lock files (`requirements.lock`, `requirements-dev.lock`) generated with `uv pip compile --generate-hashes` for reproducible, verifiable installations.
+- `pip-audit` step in the CI workflow to flag known vulnerable dependencies on every push and pull request.
+- `py.typed` marker (`src/siss/py.typed`) so downstream type-checkers can validate consumer code.
+- File-size guard in `load_palette_file()`: palette files larger than 1 MiB are rejected with a `ValueError` before JSON parsing, preventing resource exhaustion from maliciously large inputs.
+- Tests for halftone edge-drawer code paths (`_draw_symbols` with asterisk and slash symbols touching frame boundaries, exercising the previously untested `_EDGE_DRAWERS` functions).
+- Tests for `_grid_means` near-edge clipping, single-grid-point, and non-default `k` values, verifying integral-image mean computation at frame boundaries.
+- Tests for `_draw_symbols` empty-size early-return and multi-size grouping paths.
+- End-to-end split-view tests for duotone and halftone on still images (both orientations) and for `process_video_frames` (video split-view path).
+- Size-limit boundary tests for `load_palette_file`: exactly at 1 MiB, one byte over, plus valid small and empty files.
+- Test for negative `symbol_size` in `_make_halftone_processor`.
+- Regression test verifying edge-vs-bulk drawer pixel consistency for interior asterisk and slash symbols, locking the contract between the two rendering paths.
+- DEBUG-level logging in codec validation probe failures, font-loading fallback exceptions, and ffprobe probe failures, replacing silent `except Exception`/`except (TimeoutExpired, OSError)` blocks so failures leave diagnostic breadcrumbs.
+
+### Changed
+
+- **Refactor:** split `src/siss/colors.py` (719 lines) into the `src/siss/colors/` package with three single-concern submodules: `_parse.py` (hex/CSS/RGB parsing and validation), `_palettes.py` (curated palettes and JSON palette-file loading), and `_preview.py` (palette contact-sheet renderer with system font discovery). The public API is re-exported unchanged from `colors/__init__.py`; all call sites continue to `import from siss.colors` without modification.
+- `apply_duotone_image` and `apply_halftone_image` backward-compat shims now accept and forward `split_direction` and `no_audio`, making them true pass-throughs to `apply_duotone`/`apply_halftone` rather than feature-incomplete wrappers.
+- Consolidated duplicate core algorithm test files: `tests/test_core_algorithms.py` (unittest) removed; its coverage was already present in `tests/test_core_algorithms_pytest.py` (pytest).
+- `audio.py` and `video_processing.py` now use `logging` instead of `print()` to stderr for warnings and information messages.
+- Added `Pillow>=11.0.0` dependency for system font rendering in the palette preview contact sheet.
+- **Security:** raised `opencv-python` minimum version from `>=4.5.0` to `>=4.10.0` to exclude versions predating CVE fixes (CVE-2023-2617, CVE-2023-2618).
+- **Security:** the `main()` catch-all exception handler now emits the full traceback only when log level is `DEBUG` (`-vv`); at default verbosity, it logs a user-friendly message without leaking file paths or stack frames.
+- **Security:** ffmpeg error output embedded in audio-merge warning messages is truncated to 200 characters, preventing long stderr strings with absolute paths from appearing in logs.
+- `tqdm` progress bar is automatically disabled when `--quiet` is active (root logger at ERROR or above).
+- `main()` exception handler now distinguishes `FileNotFoundError`, `ValueError`, and `RuntimeError` from unexpected exceptions; all are logged via `logging` instead of `print()` to stderr.
+- Indentation bug in `process_video_frames` fixed: `out` and `progress_bar` are now assigned outside the guard clause, not unreachable inside it.
+- `_draw_symbols` guards against an empty `sizes` array, returning early instead of iterating zero symbols.
+
+### Fixed
+
+- Inner closures `_duotone_frame` and `_halftone_frame` in the processor factories now carry type annotations on their `frame` parameters and return types.
+- `_make_halftone_processor` had a structural bug where `_halftone_frame` was defined at module scope instead of inside the closure; the `return _halftone_frame` statement was unreachable and `apply_halftone` received `None`. Restored correct indentation.
+
 ## [0.7.2] - 2026-07-27
 
 ### Added

@@ -15,6 +15,7 @@ from argparse import Namespace
 from unittest import mock
 
 from siss.main import (
+    _configure_logging,
     _resolve_colors,
     main,
     resolve_color_arg,
@@ -37,6 +38,8 @@ def _ns(**kwargs):
         symbol_size=10,
         symbol_type="plus",
         grid_type="square",
+        verbose=0,
+        quiet=False,
     )
     base.update(kwargs)
     return Namespace(**base)
@@ -525,6 +528,234 @@ class TestMainPaletteFile(unittest.TestCase):
         ):
             rc = main()
         self.assertEqual(rc, 1)
+
+
+class TestMainLogging(unittest.TestCase):
+    """Tests for structured logging and --verbose/--quiet flags."""
+
+    def setUp(self):
+        import logging
+        import tempfile
+
+        self.tmp = tempfile.TemporaryDirectory()
+        self.input_path = os.path.join(self.tmp.name, "input.mp4")
+        self.output_path = os.path.join(self.tmp.name, "output.mp4")
+        open(self.input_path, "wb").close()
+
+        root = logging.getLogger()
+        for handler in root.handlers[:]:
+            root.removeHandler(handler)
+        root.setLevel(logging.WARNING)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_configure_logging_default_level(self):
+        """Default (no flags) sets WARNING level."""
+        import logging
+
+        args = _ns()
+        _configure_logging(args)
+        self.assertEqual(logging.getLogger().getEffectiveLevel(), logging.WARNING)
+
+    def test_configure_logging_verbose_once(self):
+        """-v sets INFO level."""
+        import logging
+
+        args = _ns(verbose=1)
+        _configure_logging(args)
+        self.assertEqual(logging.getLogger().getEffectiveLevel(), logging.INFO)
+
+    def test_configure_logging_verbose_twice(self):
+        """-vv sets DEBUG level."""
+        import logging
+
+        args = _ns(verbose=2)
+        _configure_logging(args)
+        self.assertEqual(logging.getLogger().getEffectiveLevel(), logging.DEBUG)
+
+    def test_configure_logging_quiet(self):
+        """--quiet sets ERROR level."""
+        import logging
+
+        args = _ns(quiet=True)
+        _configure_logging(args)
+        self.assertEqual(logging.getLogger().getEffectiveLevel(), logging.ERROR)
+
+    def test_quiet_overrides_verbose(self):
+        """--quiet -v sets ERROR level regardless of verbosity."""
+        import logging
+
+        args = _ns(quiet=True, verbose=2)
+        _configure_logging(args)
+        self.assertEqual(logging.getLogger().getEffectiveLevel(), logging.ERROR)
+
+    def test_quiet_flag_accepted_in_main(self):
+        """--quiet flag produces a successful run."""
+        with mock.patch("siss.main.apply_duotone"):
+            with mock.patch(
+                "sys.argv",
+                [
+                    "siss",
+                    self.input_path,
+                    self.output_path,
+                    "--effect",
+                    "duotone",
+                    "--quiet",
+                ],
+            ):
+                rc = main()
+        self.assertEqual(rc, 0)
+
+    def test_verbose_flag_accepted_in_main(self):
+        """--verbose flag produces a successful run."""
+        with mock.patch("siss.main.apply_duotone"):
+            with mock.patch(
+                "sys.argv",
+                [
+                    "siss",
+                    self.input_path,
+                    self.output_path,
+                    "--effect",
+                    "duotone",
+                    "-vv",
+                ],
+            ):
+                rc = main()
+        self.assertEqual(rc, 0)
+
+    def test_error_messages_go_to_logger_not_print(self):
+        """FileNotFoundError is logged via logger, not print."""
+        with mock.patch(
+            "sys.argv",
+            ["siss", "/nonexistent", "out.mp4", "--effect", "duotone"],
+        ):
+            with mock.patch("builtins.print") as mock_print:
+                rc = main()
+        self.assertEqual(rc, 1)
+        stderr_calls = [
+            call
+            for call in mock_print.call_args_list
+            if call[1]
+            and call[1].get("file")
+            and "stderr" in str(call[1]["file"])
+        ]
+        self.assertFalse(stderr_calls)
+
+    def test_runtime_error_returns_one(self):
+        """RuntimeError from the effect function returns exit code 1."""
+        with mock.patch(
+            "siss.main.apply_duotone",
+            side_effect=RuntimeError("write failure"),
+        ):
+            with mock.patch(
+                "sys.argv",
+                ["siss", self.input_path, self.output_path, "--effect", "duotone"],
+            ):
+                rc = main()
+        self.assertEqual(rc, 1)
+
+    def test_unexpected_exception_returns_one(self):
+        """A truly unexpected exception (e.g. KeyError) is caught and returns 1."""
+        with mock.patch(
+            "siss.main.apply_duotone",
+            side_effect=KeyError("unknown"),
+        ):
+            with mock.patch(
+                "sys.argv",
+                ["siss", self.input_path, self.output_path, "--effect", "duotone"],
+            ):
+                rc = main()
+        self.assertEqual(rc, 1)
+
+
+class TestMainPalettePreview(unittest.TestCase):
+    """Tests for the --export-palette-preview CLI flag."""
+
+    def setUp(self):
+        import tempfile
+
+        self.tmp = tempfile.TemporaryDirectory()
+        self.preview_path = os.path.join(self.tmp.name, "preview.png")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_export_palette_preview_flag_returns_zero(self):
+        with mock.patch("sys.argv", ["siss", "--export-palette-preview", self.preview_path]):
+            rc = main()
+        self.assertEqual(rc, 0)
+        self.assertTrue(os.path.isfile(self.preview_path))
+
+    def test_export_palette_preview_with_custom_file(self):
+        import json
+
+        palette_path = os.path.join(self.tmp.name, "p.json")
+        with open(palette_path, "w") as f:
+            json.dump({"brand": {"color1": "#ff0000", "color2": "#0000ff"}}, f)
+
+        with mock.patch(
+            "sys.argv",
+            [
+                "siss",
+                "--export-palette-preview",
+                self.preview_path,
+                "--palette-file",
+                palette_path,
+            ],
+        ):
+            rc = main()
+        self.assertEqual(rc, 0)
+        self.assertTrue(os.path.isfile(self.preview_path))
+
+
+class TestMainSplitView(unittest.TestCase):
+    """Tests for the --split-view CLI flag."""
+
+    def setUp(self):
+        import tempfile
+
+        self.tmp = tempfile.TemporaryDirectory()
+        self.input_path = os.path.join(self.tmp.name, "input.png")
+        self.output_path = os.path.join(self.tmp.name, "output.png")
+        open(self.input_path, "wb").close()
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_split_view_vertical_forwards_to_duotone(self):
+        with mock.patch("siss.main.apply_duotone") as mock_dt:
+            with mock.patch(
+                "sys.argv",
+                [
+                    "siss",
+                    self.input_path,
+                    self.output_path,
+                    "--effect", "duotone",
+                    "--split-view", "vertical",
+                ],
+            ):
+                rc = main()
+        self.assertEqual(rc, 0)
+        _, kwargs = mock_dt.call_args
+        self.assertEqual(kwargs["split_direction"], "vertical")
+
+    def test_split_view_horizontal_forwards_to_halftone(self):
+        with mock.patch("siss.main.apply_halftone") as mock_ht:
+            with mock.patch(
+                "sys.argv",
+                [
+                    "siss",
+                    self.input_path,
+                    self.output_path,
+                    "--effect", "halftone",
+                    "--split-view", "horizontal",
+                ],
+            ):
+                rc = main()
+        self.assertEqual(rc, 0)
+        _, kwargs = mock_ht.call_args
+        self.assertEqual(kwargs["split_direction"], "horizontal")
 
 
 if __name__ == "__main__":

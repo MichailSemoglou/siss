@@ -298,5 +298,147 @@ class TestSafeInt(unittest.TestCase):
         self.assertEqual(_safe_int(float('-inf')), 0)
 
 
+class TestSplitView(unittest.TestCase):
+    """Tests for --split-view feature in process_image and process_video_frames."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.input_path = os.path.join(self.tmp.name, "input.png")
+        self.output_path = os.path.join(self.tmp.name, "output.png")
+        h, w = 60, 80
+        self.original = np.random.randint(0, 256, (h, w, 3), dtype=np.uint8)
+        cv2.imwrite(self.input_path, self.original)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _identity(self, frame):
+        return frame
+
+    def test_vertical_split_doubles_width(self):
+        process_image(self.input_path, self.output_path, self._identity,
+                       split_direction="vertical")
+        result = cv2.imread(self.output_path)
+        self.assertEqual(result.shape[0], self.original.shape[0])
+        self.assertEqual(result.shape[1], self.original.shape[1] * 2)
+
+    def test_horizontal_split_doubles_height(self):
+        process_image(self.input_path, self.output_path, self._identity,
+                       split_direction="horizontal")
+        result = cv2.imread(self.output_path)
+        self.assertEqual(result.shape[0], self.original.shape[0] * 2)
+        self.assertEqual(result.shape[1], self.original.shape[1])
+
+    def test_vertical_split_left_half_is_original(self):
+        process_image(self.input_path, self.output_path, self._identity,
+                       split_direction="vertical")
+        result = cv2.imread(self.output_path)
+        w = self.original.shape[1]
+        np.testing.assert_array_equal(result[:, :w], self.original)
+
+    def test_horizontal_split_top_half_is_original(self):
+        process_image(self.input_path, self.output_path, self._identity,
+                       split_direction="horizontal")
+        result = cv2.imread(self.output_path)
+        h = self.original.shape[0]
+        np.testing.assert_array_equal(result[:h, :], self.original)
+
+    def test_no_split_produces_same_dimensions(self):
+        process_image(self.input_path, self.output_path, self._identity)
+        result = cv2.imread(self.output_path)
+        self.assertEqual(result.shape, self.original.shape)
+
+    def test_invalid_split_direction_raises(self):
+        with self.assertRaises(ValueError):
+            process_image(self.input_path, self.output_path, self._identity,
+                          split_direction="diagonal")
+
+
+class TestVideoSplitView(unittest.TestCase):
+    """Tests for --split-view feature in process_video_frames."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.in_path = os.path.join(self.tmp.name, "in.mp4")
+        self.out_path = os.path.join(self.tmp.name, "out.mp4")
+        make_test_video(self.in_path, width=160, height=120, frames=3, gradient=True)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _identity(self, frame):
+        return frame
+
+    def _invert(self, frame):
+        return cv2.bitwise_not(frame)
+
+    def test_vertical_split_doubles_width(self):
+        try:
+            process_video_frames(self.in_path, self.out_path, self._invert,
+                                 split_direction="vertical")
+            cap = cv2.VideoCapture(self.out_path)
+            self.assertTrue(cap.isOpened())
+            ret, frame = cap.read()
+            self.assertTrue(ret)
+            self.assertEqual(frame.shape[0], 120)
+            self.assertEqual(frame.shape[1], 320)
+            # Left half is the original gradient (dark at top); right half is
+            # the inverted gradient (bright at top). Assert that ordering.
+            w = frame.shape[1] // 2
+            left_top_mean = float(frame[:30, :w].mean())
+            right_top_mean = float(frame[:30, w:].mean())
+            self.assertLess(
+                left_top_mean + 50, right_top_mean,
+                f"Left (original) top rows mean {left_top_mean:.1f} should be "
+                f"at least 50 units darker than right (inverted) top rows mean "
+                f"{right_top_mean:.1f}",
+            )
+            cap.release()
+        except (cv2.error, RuntimeError):
+            self.skipTest("Codec not available in this environment")
+
+    def test_horizontal_split_doubles_height(self):
+        try:
+            process_video_frames(self.in_path, self.out_path, self._invert,
+                                 split_direction="horizontal")
+            cap = cv2.VideoCapture(self.out_path)
+            self.assertTrue(cap.isOpened())
+            ret, frame = cap.read()
+            self.assertTrue(ret)
+            self.assertEqual(frame.shape[0], 240)
+            self.assertEqual(frame.shape[1], 160)
+            # Top half is the original gradient (dark at top); bottom half is
+            # the inverted gradient (bright at top). Assert that ordering.
+            h = frame.shape[0] // 2
+            orig_top_mean = float(frame[:10].mean())
+            inv_top_mean = float(frame[h:h + 10].mean())
+            self.assertLess(
+                orig_top_mean + 50, inv_top_mean,
+                f"Original top rows mean {orig_top_mean:.1f} should be at least "
+                f"50 units darker than inverted top rows mean {inv_top_mean:.1f}",
+            )
+            cap.release()
+        except (cv2.error, RuntimeError):
+            self.skipTest("Codec not available in this environment")
+
+    def test_no_split_preserves_dimensions(self):
+        try:
+            process_video_frames(self.in_path, self.out_path, self._identity)
+            cap = cv2.VideoCapture(self.out_path)
+            self.assertTrue(cap.isOpened())
+            ret, frame = cap.read()
+            self.assertTrue(ret)
+            self.assertEqual(frame.shape[0], 120)
+            self.assertEqual(frame.shape[1], 160)
+            cap.release()
+        except (cv2.error, RuntimeError):
+            self.skipTest("Codec not available in this environment")
+
+    def test_invalid_split_direction_raises(self):
+        with self.assertRaises(ValueError):
+            process_video_frames(self.in_path, self.out_path, self._identity,
+                                 split_direction="diagonal")
+
+
 if __name__ == "__main__":
     unittest.main()
