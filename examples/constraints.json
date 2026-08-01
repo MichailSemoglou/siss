@@ -1,0 +1,9 @@
+{
+  "effect": "halftone",
+  "color1": "#0d0d12",
+  "color2": "#e8e4da",
+  "symbol_type": "dot",
+  "grid_type": "hex",
+  "symbol_size": 12,
+  "luminance_curve": { "gamma": 1.8 }
+}

@@ -4,8 +4,29 @@
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.7.x   | :white_check_mark: |
-| < 0.7   | :x:                |
+| 1.0.x   | :white_check_mark: |
+| < 1.0   | :x:                |
+
+Current release: `1.0.0`.
+
+## Trust Model
+
+Siss is a local CLI tool. The caller is trusted with filesystem access, and
+the tool operates entirely within the current working directory. Output paths
+are normalized with `os.path.realpath()` and rejected if they escape the
+working directory.
+
+Subprocess calls to `ffmpeg` and `ffprobe` use list arguments (no
+`shell=True`), preventing shell injection. The binary paths are resolved from
+the `SISS_FFMPEG` and `SISS_FFPROBE` environment variables when set, falling
+back to `shutil.which()`. In environments where the process environment is
+not trusted (e.g., CI runners executing untrusted code), those variables
+should be cleared before invoking Siss.
+
+The `-vv` (DEBUG) log level outputs full exception tracebacks, which may
+include local filesystem paths and module names. In automated pipelines,
+prefer `-v` (INFO) or the default WARNING level to avoid leaking internal
+paths into log aggregation.
 
 ## Reporting a Vulnerability
 
