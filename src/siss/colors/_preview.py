@@ -54,11 +54,11 @@ def _find_mono_font(size: int):
                 try:
                     font_bold = ImageFont.truetype(path, size=size, index=1)
                 except Exception:
-                    _log.debug("Could not load bold font from %r", path)
+                    _log.debug("Could not load bold variant from %r", os.path.basename(path))
                     font_bold = font
                 break
             except Exception:
-                _log.debug("Could not load font from %r", path)
+                _log.debug("Could not load font from %r", os.path.basename(path))
                 continue
     if font is None:
         font = ImageFont.load_default()
@@ -166,4 +166,4 @@ def export_palette_preview(
         draw.line((padding, sep_y, canvas_w - padding, sep_y), fill=row_line, width=1)
 
     img.save(output_path, format="PNG")
-    print(f"Palette preview saved to {output_path}")
+    _log.info("Palette preview saved to %s", os.path.basename(output_path))

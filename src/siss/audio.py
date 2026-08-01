@@ -102,6 +102,7 @@ def merge_audio(source_path: str, output_path: str) -> bool:
     )
     os.close(tmp_fd)
 
+    success = False
     try:
         subprocess.run(
             [
@@ -120,24 +121,21 @@ def merge_audio(source_path: str, output_path: str) -> bool:
             stderr=subprocess.PIPE,
         )
         os.replace(tmp_path, output_path)
-        return True
+        success = True
     except subprocess.CalledProcessError as e:
         msg = "ffmpeg could not merge audio; output is silent."
         if e.stderr:
-            # The last stderr line (capped at 200 chars) is forwarded to
-            # the warning so CLI users can diagnose the failure without
-            # having to re-run with -vv.  It may contain file-system
-            # paths; avoid forwarding this detail in log aggregation
-            # pipelines by setting the log level above WARNING.
             detail = e.stderr.decode(errors='replace').strip().rsplit(chr(10), 1)[-1]
+            detail = detail.replace(tmp_path, "<tmp>").replace(output_path, "<output>")
             detail = detail[:200] + ("..." if len(detail) > 200 else "")
             msg += f" ({detail})"
         _log.warning(msg)
-        if os.path.exists(tmp_path):
-            os.unlink(tmp_path)
-        return False
     except (subprocess.TimeoutExpired, OSError):
         _log.warning("ffmpeg could not merge audio; output is silent.")
-        if os.path.exists(tmp_path):
-            os.unlink(tmp_path)
-        return False
+    finally:
+        if not success:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+    return success

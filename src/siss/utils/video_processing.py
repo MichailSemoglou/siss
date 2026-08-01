@@ -83,10 +83,38 @@ def is_image_file(file_path: str) -> bool:
 
 def _validate_split_direction(split_direction: Optional[str]) -> None:
     """Raise ValueError for unsupported split_direction values."""
-    if split_direction is not None and split_direction not in ("vertical", "horizontal"):
+    valid = (None, "vertical", "horizontal", "vertical-full", "horizontal-full")
+    if split_direction not in valid:
         raise ValueError(
-            f"split_direction must be 'vertical', 'horizontal', or None; got {split_direction!r}"
+            f"split_direction must be one of {', '.join(repr(v) for v in valid if v is not None)}, "
+            f"or None; got {split_direction!r}"
         )
+
+
+def split_view_stitch(main_frame: np.ndarray, alt_frame: np.ndarray, split_direction: str) -> np.ndarray:
+    """
+    Stitch two processed frames side-by-side or top-and-bottom.
+
+    Returns a single frame where the ``alt_frame`` occupies the left or
+    top portion and the ``main_frame`` occupies the right or bottom
+    portion. For ``-full`` modes the full frames are concatenated.
+    """
+    if split_direction == "vertical":
+        w = main_frame.shape[1]
+        half = w // 2
+        return np.concatenate(
+            (alt_frame[:, :half], main_frame[:, half:]), axis=1
+        )
+    elif split_direction == "horizontal":
+        h = main_frame.shape[0]
+        half = h // 2
+        return np.concatenate(
+            (alt_frame[:half, :], main_frame[half:, :]), axis=0
+        )
+    elif split_direction == "vertical-full":
+        return np.concatenate((alt_frame, main_frame), axis=1)
+    else:  # horizontal-full
+        return np.concatenate((alt_frame, main_frame), axis=0)
 
 
 def process_image(image_path: str, output_path: str, process_function: Callable[..., Any], **kwargs: Any) -> None:
@@ -98,33 +126,50 @@ def process_image(image_path: str, output_path: str, process_function: Callable[
         output_path (str): Path where the processed image will be saved
         process_function (callable): Function to apply to the image
             The function should take a frame and return a processed frame
-        **kwargs: Additional arguments to pass to the process_function
-
-    Raises:
-        FileNotFoundError: If the image file cannot be opened
-
-    Example:
-        def grayscale(frame):
-            return cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-        process_image('input.png', 'output.png', grayscale)
+        **kwargs: Additional arguments. Recognised keys:
+            split_direction (str): 'vertical' or 'horizontal' split view
+            loss_map_path (str): path for an optional loss-map image
     """
     frame = cv2.imread(image_path)
     if frame is None:
         raise FileNotFoundError(f"Cannot open image file: {image_path}")
 
     split = kwargs.pop("split_direction", None)
+    loss_map_path = kwargs.pop("loss_map_path", None)
+    skip_split_concat = kwargs.pop("_skip_split_concat", False)
     _validate_split_direction(split)
-    processed_frame = process_function(frame, **kwargs)
-    if split:
-        axis = 1 if split == "vertical" else 0
-        processed_frame = np.concatenate(
-            (frame, processed_frame), axis=axis
-        )
+    processed = process_function(frame, **kwargs)
+    if isinstance(processed, tuple):
+        processed_frame, loss_frame = processed
+    else:
+        processed_frame = processed
+        loss_frame = None
+    if split and not skip_split_concat:
+        if split.endswith("-full"):
+            axis = 1 if split.startswith("vertical") else 0
+            processed_frame = np.concatenate(
+                (frame, processed_frame), axis=axis
+            )
+        elif split == "vertical":
+            w = frame.shape[1]
+            half = w // 2
+            processed_frame = np.concatenate(
+                (frame[:, :half], processed_frame[:, half:]), axis=1
+            )
+        else:
+            h = frame.shape[0]
+            half = h // 2
+            processed_frame = np.concatenate(
+                (frame[:half, :], processed_frame[half:, :]), axis=0
+            )
     success = cv2.imwrite(output_path, processed_frame)
     if not success:
         raise RuntimeError(f"Failed to write image file: {output_path}")
-    print(f"Processed image saved to {output_path}")
+    if loss_frame is not None and loss_map_path:
+        success = cv2.imwrite(loss_map_path, loss_frame)
+        if not success:
+            raise RuntimeError(f"Failed to write loss map: {loss_map_path}")
+    _log.info("Processed image saved to %s", output_path)
 
 
 def process_video_frames(video_path: str, output_path: str, process_function: Callable[..., Any], split_direction: Optional[str] = None, **kwargs: Any) -> None:
@@ -134,9 +179,12 @@ def process_video_frames(video_path: str, output_path: str, process_function: Ca
     Args:
         video_path (str): Path to the input video
         output_path (str): Path where processed video will be saved
-        process_function (callable): Function to apply to each frame
-            The function should take a frame and return a processed frame
-        **kwargs: Additional arguments to pass to the process_function
+        process_function (callable): Function to apply to each frame.
+            When a ``loss_map_path`` kwarg is present, the function may
+            return a ``(rendered, loss_map)`` tuple instead of a single
+            frame.
+        split_direction (str): 'vertical' or 'horizontal' split view
+        **kwargs: Recognised keys include ``loss_map_path`` (str).
 
     Example:
         def grayscale(frame):
@@ -144,9 +192,12 @@ def process_video_frames(video_path: str, output_path: str, process_function: Ca
 
         process_video_frames('input.mp4', 'output.mp4', grayscale)
     """
+    loss_map_path = kwargs.pop("loss_map_path", None)
+    skip_split_concat = kwargs.pop("_skip_split_concat", False)
     _validate_split_direction(split_direction)
     cap = load_video(video_path)
     out = None
+    loss_writer = None
     progress_bar = None
 
     try:
@@ -162,10 +213,11 @@ def process_video_frames(video_path: str, output_path: str, process_function: Ca
             )
 
         out_width, out_height = width, height
-        if split_direction == "vertical":
-            out_width = width * 2
-        elif split_direction == "horizontal":
-            out_height = height * 2
+        if split_direction and split_direction.endswith("-full"):
+            if split_direction.startswith("vertical"):
+                out_width = width * 2
+            else:
+                out_height = height * 2
 
         out = create_video_writer(
             output_path, props['fps'], out_width, out_height
@@ -183,25 +235,56 @@ def process_video_frames(video_path: str, output_path: str, process_function: Ca
             if not ret:
                 break
 
-            processed_frame = process_function(frame, **kwargs)
-            if processed_frame.shape[:2] != (height, width):
-                processed_frame = cv2.resize(
-                    processed_frame, (width, height),
-                    interpolation=cv2.INTER_LINEAR,
-                )
-            if split_direction:
-                axis = 1 if split_direction == "vertical" else 0
-                processed_frame = np.concatenate(
-                    (frame, processed_frame), axis=axis
-                )
+            processed = process_function(frame, **kwargs)
+            if isinstance(processed, tuple):
+                processed_frame, loss_frame = processed
+                if loss_map_path and loss_writer is None:
+                    loss_writer = create_video_writer(
+                        loss_map_path, props['fps'], width, height
+                    )
+                if loss_writer is not None:
+                    loss_bgr = cv2.cvtColor(loss_frame, cv2.COLOR_GRAY2BGR)
+                    loss_writer.write(loss_bgr)
+            else:
+                processed_frame = processed
+
+            if split_direction and split_direction.endswith("-full"):
+                pass
+            elif not skip_split_concat:
+                expected_shape = (height, width)
+                if processed_frame.shape[:2] != expected_shape:
+                    processed_frame = cv2.resize(
+                        processed_frame, (expected_shape[1], expected_shape[0]),
+                        interpolation=cv2.INTER_LINEAR,
+                    )
+            if split_direction and not skip_split_concat:
+                if split_direction.endswith("-full"):
+                    axis = 1 if split_direction.startswith("vertical") else 0
+                    processed_frame = np.concatenate(
+                        (frame, processed_frame), axis=axis
+                    )
+                elif split_direction == "vertical":
+                    w = frame.shape[1]
+                    half = w // 2
+                    processed_frame = np.concatenate(
+                        (frame[:, :half], processed_frame[:, half:]), axis=1
+                    )
+                else:
+                    h = frame.shape[0]
+                    half = h // 2
+                    processed_frame = np.concatenate(
+                        (frame[:half, :], processed_frame[half:, :]), axis=0
+                    )
             out.write(processed_frame)
             progress_bar.update(1)
 
-        print(f"Processed video saved to {output_path}")
+        _log.info("Processed video saved to %s", output_path)
 
     finally:
         if progress_bar is not None:
             progress_bar.close()
+        if loss_writer is not None:
+            loss_writer.release()
         if out is not None:
             out.release()
         cap.release()
