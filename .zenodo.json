@@ -1,0 +1,25 @@
+{
+  "title": "Siss",
+  "description": "A command-line tool for applying duotone and halftone effects to video and still-image files. Version 1.0.0 introduces LLM-authored constraints files, luminance-curve gamma, ring symbol, loss-map output, dual-style split-view, and a co-creation workflow where natural-language scene descriptions become deterministic visual grammars.",
+  "creators": [
+    {
+      "name": "Semoglou, Michail",
+      "affiliation": "College of Design and Innovation, Tongji University",
+      "orcid": "0009-0003-3268-5657"
+    }
+  ],
+  "license": "MIT",
+  "version": "1.0.0",
+  "publication_date": "2026-08-01",
+  "keywords": [
+    "halftone",
+    "duotone",
+    "video-processing",
+    "image-processing",
+    "generative-art",
+    "computer-vision",
+    "command-line-tool"
+  ],
+  "access_right": "open",
+  "upload_type": "software"
+}

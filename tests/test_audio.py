@@ -135,6 +135,26 @@ class TestMergeAudio(unittest.TestCase):
                                     result = merge_audio(self.source, self.output)
         self.assertFalse(result)
 
+    def test_returns_false_when_cleanup_fails(self):
+        import subprocess as sp_mod
+
+        from siss.audio import merge_audio
+
+        with mock.patch("siss.audio._has_audio_stream", return_value=True):
+            with mock.patch("siss.audio.shutil.which", return_value="/usr/bin/ffmpeg"):
+                with mock.patch("siss.audio.subprocess.run",
+                                side_effect=sp_mod.CalledProcessError(1, "ffmpeg")):
+                    with mock.patch("siss.audio.tempfile.mkstemp",
+                                    return_value=(3, "/tmp/.siss_audio_test.mp4")):
+                        with mock.patch("siss.audio.os.close"):
+                            with mock.patch("siss.audio.os.path.exists",
+                                            return_value=True):
+                                with mock.patch("siss.audio.os.unlink",
+                                                side_effect=OSError("cleanup failed")) as mock_unlink:
+                                    result = merge_audio(self.source, self.output)
+        self.assertFalse(result)
+        mock_unlink.assert_called_once_with("/tmp/.siss_audio_test.mp4")
+
 
 # ---------------------------------------------------------------------------
 # process_media audio forwarding

@@ -315,16 +315,28 @@ class TestSplitView(unittest.TestCase):
     def _identity(self, frame):
         return frame
 
-    def test_vertical_split_doubles_width(self):
+    def test_vertical_split_preserves_dimensions(self):
         process_image(self.input_path, self.output_path, self._identity,
                        split_direction="vertical")
+        result = cv2.imread(self.output_path)
+        self.assertEqual(result.shape, self.original.shape)
+
+    def test_horizontal_split_preserves_dimensions(self):
+        process_image(self.input_path, self.output_path, self._identity,
+                       split_direction="horizontal")
+        result = cv2.imread(self.output_path)
+        self.assertEqual(result.shape, self.original.shape)
+
+    def test_vertical_full_split_doubles_width(self):
+        process_image(self.input_path, self.output_path, self._identity,
+                       split_direction="vertical-full")
         result = cv2.imread(self.output_path)
         self.assertEqual(result.shape[0], self.original.shape[0])
         self.assertEqual(result.shape[1], self.original.shape[1] * 2)
 
-    def test_horizontal_split_doubles_height(self):
+    def test_horizontal_full_split_doubles_height(self):
         process_image(self.input_path, self.output_path, self._identity,
-                       split_direction="horizontal")
+                       split_direction="horizontal-full")
         result = cv2.imread(self.output_path)
         self.assertEqual(result.shape[0], self.original.shape[0] * 2)
         self.assertEqual(result.shape[1], self.original.shape[1])
@@ -334,14 +346,16 @@ class TestSplitView(unittest.TestCase):
                        split_direction="vertical")
         result = cv2.imread(self.output_path)
         w = self.original.shape[1]
-        np.testing.assert_array_equal(result[:, :w], self.original)
+        half = w // 2
+        np.testing.assert_array_equal(result[:, :half], self.original[:, :half])
 
     def test_horizontal_split_top_half_is_original(self):
         process_image(self.input_path, self.output_path, self._identity,
                        split_direction="horizontal")
         result = cv2.imread(self.output_path)
         h = self.original.shape[0]
-        np.testing.assert_array_equal(result[:h, :], self.original)
+        half = h // 2
+        np.testing.assert_array_equal(result[:half, :], self.original[:half, :])
 
     def test_no_split_produces_same_dimensions(self):
         process_image(self.input_path, self.output_path, self._identity)
@@ -372,18 +386,18 @@ class TestVideoSplitView(unittest.TestCase):
     def _invert(self, frame):
         return cv2.bitwise_not(frame)
 
-    def test_vertical_split_doubles_width(self):
+    def test_vertical_split_preserves_dimensions(self):
         try:
             process_video_frames(self.in_path, self.out_path, self._invert,
-                                 split_direction="vertical")
+                                  split_direction="vertical")
             cap = cv2.VideoCapture(self.out_path)
             self.assertTrue(cap.isOpened())
             ret, frame = cap.read()
             self.assertTrue(ret)
             self.assertEqual(frame.shape[0], 120)
-            self.assertEqual(frame.shape[1], 320)
+            self.assertEqual(frame.shape[1], 160)
             # Left half is the original gradient (dark at top); right half is
-            # the inverted gradient (bright at top). Assert that ordering.
+            # the inverted gradient (bright at top).
             w = frame.shape[1] // 2
             left_top_mean = float(frame[:30, :w].mean())
             right_top_mean = float(frame[:30, w:].mean())
@@ -397,29 +411,139 @@ class TestVideoSplitView(unittest.TestCase):
         except (cv2.error, RuntimeError):
             self.skipTest("Codec not available in this environment")
 
-    def test_horizontal_split_doubles_height(self):
+    def test_horizontal_split_preserves_dimensions(self):
         try:
             process_video_frames(self.in_path, self.out_path, self._invert,
-                                 split_direction="horizontal")
+                                  split_direction="horizontal")
             cap = cv2.VideoCapture(self.out_path)
             self.assertTrue(cap.isOpened())
             ret, frame = cap.read()
             self.assertTrue(ret)
-            self.assertEqual(frame.shape[0], 240)
+            self.assertEqual(frame.shape[0], 120)
             self.assertEqual(frame.shape[1], 160)
             # Top half is the original gradient (dark at top); bottom half is
-            # the inverted gradient (bright at top). Assert that ordering.
+            # the inverted gradient.
             h = frame.shape[0] // 2
             orig_top_mean = float(frame[:10].mean())
             inv_top_mean = float(frame[h:h + 10].mean())
             self.assertLess(
                 orig_top_mean + 50, inv_top_mean,
                 f"Original top rows mean {orig_top_mean:.1f} should be at least "
-                f"50 units darker than inverted top rows mean {inv_top_mean:.1f}",
+                f"50 units darker than bottom-half top rows mean {inv_top_mean:.1f}",
             )
             cap.release()
         except (cv2.error, RuntimeError):
             self.skipTest("Codec not available in this environment")
+
+    def test_vertical_full_split_doubles_width(self):
+        try:
+            process_video_frames(self.in_path, self.out_path, self._invert,
+                                  split_direction="vertical-full")
+            cap = cv2.VideoCapture(self.out_path)
+            self.assertTrue(cap.isOpened())
+            ret, frame = cap.read()
+            self.assertTrue(ret)
+            self.assertEqual(frame.shape[0], 120)
+            self.assertEqual(frame.shape[1], 320)
+            cap.release()
+        except (cv2.error, RuntimeError):
+            self.skipTest("Codec not available in this environment")
+
+    def test_horizontal_full_split_doubles_height(self):
+        try:
+            process_video_frames(self.in_path, self.out_path, self._invert,
+                                  split_direction="horizontal-full")
+            cap = cv2.VideoCapture(self.out_path)
+            self.assertTrue(cap.isOpened())
+            ret, frame = cap.read()
+            self.assertTrue(ret)
+            self.assertEqual(frame.shape[0], 240)
+            self.assertEqual(frame.shape[1], 160)
+            cap.release()
+        except (cv2.error, RuntimeError):
+            self.skipTest("Codec not available in this environment")
+
+    def test_vertical_full_split_skip_concat_uses_already_doubled_frame(self):
+        def already_doubled(frame):
+            return np.concatenate((frame, frame), axis=1)
+
+        process_video_frames(
+            self.in_path,
+            self.out_path,
+            already_doubled,
+            split_direction="vertical-full",
+            _skip_split_concat=True,
+        )
+        cap = cv2.VideoCapture(self.out_path)
+        self.assertTrue(cap.isOpened())
+        try:
+            ret, frame = cap.read()
+            self.assertTrue(ret)
+            self.assertEqual(frame.shape[0], 120)
+            self.assertEqual(frame.shape[1], 320)
+        finally:
+            cap.release()
+
+    def test_horizontal_full_split_skip_concat_uses_already_doubled_frame(self):
+        def already_doubled(frame):
+            return np.concatenate((frame, frame), axis=0)
+
+        process_video_frames(
+            self.in_path,
+            self.out_path,
+            already_doubled,
+            split_direction="horizontal-full",
+            _skip_split_concat=True,
+        )
+        cap = cv2.VideoCapture(self.out_path)
+        self.assertTrue(cap.isOpened())
+        try:
+            ret, frame = cap.read()
+            self.assertTrue(ret)
+            self.assertEqual(frame.shape[0], 240)
+            self.assertEqual(frame.shape[1], 160)
+        finally:
+            cap.release()
+
+    def test_loss_map_path_uses_grayscale_tuple_and_releases_writers(self):
+        class RecordingWriter:
+            def __init__(self):
+                self.frames = []
+                self.released = False
+
+            def write(self, frame):
+                self.frames.append(frame)
+
+            def release(self):
+                self.released = True
+
+        created_writers = []
+
+        def fake_create_video_writer(path, fps, width, height):
+            writer = RecordingWriter()
+            created_writers.append((path, fps, width, height, writer))
+            return writer
+
+        def processor(frame):
+            loss_map = np.zeros((frame.shape[0], frame.shape[1]), dtype=np.uint8)
+            return frame, loss_map
+
+        loss_path = os.path.join(self.tmp.name, "loss.mp4")
+        with mock.patch("siss.utils.video_processing.create_video_writer", side_effect=fake_create_video_writer):
+            process_video_frames(
+                self.in_path,
+                self.out_path,
+                processor,
+                loss_map_path=loss_path,
+            )
+
+        self.assertEqual(len(created_writers), 2)
+        self.assertEqual(created_writers[0][0], self.out_path)
+        self.assertEqual(created_writers[1][0], loss_path)
+        self.assertEqual(created_writers[0][4].frames[0].shape, (120, 160, 3))
+        self.assertEqual(created_writers[1][4].frames[0].shape, (120, 160, 3))
+        self.assertTrue(created_writers[0][4].released)
+        self.assertTrue(created_writers[1][4].released)
 
     def test_no_split_preserves_dimensions(self):
         try:

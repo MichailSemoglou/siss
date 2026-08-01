@@ -9,7 +9,7 @@ import cv2
 import numpy as np
 
 from siss.halftone import apply_halftone, apply_halftone_image
-from tests.helpers import make_gradient_image, make_test_video
+from tests.helpers import _SplitViewImageTestMixin, make_gradient_image, make_test_video
 
 
 class TestHalftone(unittest.TestCase):
@@ -60,11 +60,37 @@ class TestHalftone(unittest.TestCase):
         except cv2.error:
             self.skipTest("Codec not available")
 
+    def test_dual_halftone_video_full_canvas_dimensions(self):
+        """Full-canvas split video output preserves the doubled width."""
+        try:
+            output_path = os.path.join(self.temp_dir.name, "full_canvas.mp4")
+            apply_halftone(
+                self.input_path,
+                output_path,
+                8,
+                (0, 0, 0),
+                (255, 255, 255),
+                alt_color1_rgb=(255, 0, 0),
+                alt_color2_rgb=(0, 0, 0),
+                split_direction="vertical-full",
+                no_audio=True,
+            )
+
+            cap = cv2.VideoCapture(output_path)
+            self.assertTrue(cap.isOpened())
+            ret, frame = cap.read()
+            self.assertTrue(ret)
+            self.assertEqual(frame.shape[1], 640)
+            self.assertEqual(frame.shape[0], 240)
+            cap.release()
+        except cv2.error:
+            self.skipTest("Codec not available")
+
     def test_symbol_types(self):
         """Test different symbol types."""
         # Skip test if codec not available
         try:
-            symbol_types = ['plus', 'asterisk', 'slash', 'dot']
+            symbol_types = ['plus', 'asterisk', 'slash', 'dot', 'ring']
 
             for symbol_type in symbol_types:
                 output_path = os.path.join(self.temp_dir.name, f"test_{symbol_type}.mp4")
@@ -131,6 +157,19 @@ class TestHalftone(unittest.TestCase):
             apply_halftone(self.input_path, self.output_path, 0, (0, 0, 0), (255, 255, 255))
 
 
+    def test_invalid_gamma_values_raise(self):
+        """Direct halftone calls should reject booleans and non-finite gamma values."""
+        for gamma in (True, float("inf"), float("nan"), 0, -1.0):
+            with self.assertRaises(ValueError):
+                apply_halftone(
+                    self.input_path,
+                    self.output_path,
+                    10,
+                    (0, 0, 0),
+                    (255, 255, 255),
+                    gamma=gamma,
+                )
+
     def test_negative_symbol_size_raises(self):
         """Negative symbol_size should raise ValueError, not silently produce invalid output."""
         with self.assertRaises(ValueError):
@@ -138,7 +177,7 @@ class TestHalftone(unittest.TestCase):
                            -5, (0, 0, 0), (255, 255, 255))
 
 
-class TestHalftoneSplitView(unittest.TestCase):
+class TestHalftoneSplitView(unittest.TestCase, _SplitViewImageTestMixin):
     """End-to-end tests for halftone with --split-view."""
 
     def setUp(self):
@@ -148,55 +187,20 @@ class TestHalftoneSplitView(unittest.TestCase):
         h, w = 60, 80
         self.original = np.random.randint(0, 256, (h, w, 3), dtype=np.uint8)
         cv2.imwrite(self.input_path, self.original)
+        self.effect_func = apply_halftone
+        self.base_args = (10, (0, 0, 0), (255, 255, 255))
 
     def tearDown(self):
         self.temp_dir.cleanup()
 
     def test_split_view_vertical_doubles_width(self):
-        w = self.original.shape[1]
-        nosplit_path = os.path.join(self.temp_dir.name, "nosplit_v.png")
-        apply_halftone(self.input_path, nosplit_path, 10, (0, 0, 0), (255, 255, 255))
-        halftone_render = cv2.imread(nosplit_path)
-
-        apply_halftone(self.input_path, self.output_path, 10,
-                       (0, 0, 0), (255, 255, 255), split_direction="vertical")
-        result = cv2.imread(self.output_path)
-        self.assertEqual(result.shape[0], self.original.shape[0])
-        self.assertEqual(result.shape[1], self.original.shape[1] * 2)
-        np.testing.assert_array_equal(
-            result[:, :w], self.original,
-            err_msg="left half should equal the original image",
-        )
-        np.testing.assert_array_equal(
-            result[:, w:], halftone_render,
-            err_msg="right half should equal the halftone render",
-        )
+        self._test_split_view_vertical()
 
     def test_split_view_horizontal_doubles_height(self):
-        h = self.original.shape[0]
-        nosplit_path = os.path.join(self.temp_dir.name, "nosplit_h.png")
-        apply_halftone(self.input_path, nosplit_path, 10, (0, 0, 0), (255, 255, 255))
-        halftone_render = cv2.imread(nosplit_path)
-
-        apply_halftone(self.input_path, self.output_path, 10,
-                       (0, 0, 0), (255, 255, 255), split_direction="horizontal")
-        result = cv2.imread(self.output_path)
-        self.assertEqual(result.shape[0], self.original.shape[0] * 2)
-        self.assertEqual(result.shape[1], self.original.shape[1])
-        np.testing.assert_array_equal(
-            result[:h, :], self.original,
-            err_msg="top half should equal the original image",
-        )
-        np.testing.assert_array_equal(
-            result[h:, :], halftone_render,
-            err_msg="bottom half should equal the halftone render",
-        )
+        self._test_split_view_horizontal()
 
     def test_no_split_preserves_dimensions(self):
-        apply_halftone(self.input_path, self.output_path, 10,
-                       (0, 0, 0), (255, 255, 255))
-        result = cv2.imread(self.output_path)
-        self.assertEqual(result.shape, self.original.shape)
+        self._test_no_split_preserves_dimensions()
 
 
 class TestHalftoneImage(unittest.TestCase):
@@ -232,7 +236,7 @@ class TestHalftoneImage(unittest.TestCase):
         """A fully white frame has zero luminance-driven sizes: background only."""
         cv2.imwrite(self.input_path, np.full((120, 160, 3), 255, dtype=np.uint8))
 
-        for symbol_type in ('plus', 'asterisk', 'slash', 'dot'):
+        for symbol_type in ('plus', 'asterisk', 'slash', 'dot', 'ring'):
             for grid_type in ('square', 'hex'):
                 apply_halftone_image(
                     self.input_path, self.output_path, 10,
@@ -248,7 +252,7 @@ class TestHalftoneImage(unittest.TestCase):
         """A fully black frame gives every cell the maximum symbol size."""
         cv2.imwrite(self.input_path, np.zeros((120, 160, 3), dtype=np.uint8))
 
-        for symbol_type in ('plus', 'asterisk', 'slash', 'dot'):
+        for symbol_type in ('plus', 'asterisk', 'slash', 'dot', 'ring'):
             for grid_type in ('square', 'hex'):
                 apply_halftone_image(
                     self.input_path, self.output_path, 10,
@@ -273,6 +277,157 @@ class TestHalftoneImage(unittest.TestCase):
         """Test error handling for invalid symbol type on the image path."""
         with self.assertRaises(ValueError):
             apply_halftone_image(self.input_path, self.output_path, 10, (0, 0, 0), (255, 255, 255), symbol_type='invalid_type')
+
+
+class TestHalftoneLossMap(unittest.TestCase):
+    """Tests for the loss-map feature."""
+
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.input_path = os.path.join(self.temp_dir.name, "input.png")
+        self.output_path = os.path.join(self.temp_dir.name, "output.png")
+        self.loss_path = os.path.join(self.temp_dir.name, "loss.png")
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    def test_loss_map_tuple_return(self):
+        """When loss_map=True, the processor returns a (rendered, loss_map) tuple."""
+        from siss.halftone import _make_halftone_processor
+
+        proc = _make_halftone_processor(10, (0, 0, 0), (255, 255, 255), loss_map=True)
+        frame = np.random.randint(0, 256, (60, 80, 3), dtype=np.uint8)
+        result = proc(frame)
+        self.assertIsInstance(result, tuple)
+        self.assertEqual(len(result), 2)
+        rendered, loss = result
+        self.assertEqual(rendered.shape, (60, 80, 3))
+        self.assertEqual(loss.shape, (60, 80))
+        self.assertEqual(loss.dtype, np.uint8)
+
+    def test_loss_map_uniform_frame_shape(self):
+        """Loss map matches input dimensions and is non-negative."""
+        from siss.halftone import _make_halftone_processor
+
+        frame = np.full((60, 80, 3), 128, dtype=np.uint8)
+        proc = _make_halftone_processor(50, (0, 0, 0), (255, 255, 255), loss_map=True)
+        _, loss = proc(frame)
+        self.assertEqual(loss.shape, (60, 80))
+        self.assertTrue(np.all(loss >= 0))
+
+    def test_loss_map_image_writes(self):
+        """A loss map image is written alongside the render."""
+        frame = np.random.randint(0, 256, (60, 80, 3), dtype=np.uint8)
+        cv2.imwrite(self.input_path, frame)
+        apply_halftone(self.input_path, self.output_path, 50, (0, 0, 0), (255, 255, 255),
+                       loss_map_path=self.loss_path)
+        self.assertTrue(os.path.isfile(self.output_path))
+        self.assertTrue(os.path.isfile(self.loss_path))
+        loss_img = cv2.imread(self.loss_path, cv2.IMREAD_GRAYSCALE)
+        self.assertEqual(loss_img.shape, (60, 80))
+
+    def test_loss_map_omitted_when_path_none(self):
+        """When loss_map_path is None, no loss map file is written."""
+        frame = np.random.randint(0, 256, (60, 80, 3), dtype=np.uint8)
+        cv2.imwrite(self.input_path, frame)
+        apply_halftone(self.input_path, self.output_path, 50, (0, 0, 0), (255, 255, 255))
+        self.assertTrue(os.path.isfile(self.output_path))
+        self.assertFalse(os.path.isfile(self.loss_path))
+
+    def test_loss_map_random_noise_nonzero_loss(self):
+        """A random-noise frame produces nonzero loss across cells."""
+        from siss.halftone import _make_halftone_processor
+
+        frame = np.random.randint(0, 256, (60, 80, 3), dtype=np.uint8)
+        proc = _make_halftone_processor(50, (0, 0, 0), (255, 255, 255), loss_map=True)
+        _, loss = proc(frame)
+        self.assertTrue(np.any(loss > 0))
+
+    def test_loss_map_hex_grid_nonzero_loss(self):
+        """A hex-grid loss map still marks cells as having nonzero loss."""
+        from siss.halftone import _make_halftone_processor
+
+        frame = np.linspace(0, 255, 60 * 80 * 3, dtype=np.uint8).reshape((60, 80, 3))
+        proc = _make_halftone_processor(
+            10, (0, 0, 0), (255, 255, 255), loss_map=True, grid_type='hex'
+        )
+        _, loss = proc(frame)
+        self.assertEqual(loss.shape, (60, 80))
+        self.assertTrue(np.any(loss > 0))
+
+
+class TestHalftoneDualSplit(unittest.TestCase):
+    """Tests for split-view with dual-style processors."""
+
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.input_path = os.path.join(self.temp_dir.name, "input.png")
+        self.output_path = os.path.join(self.temp_dir.name, "output.png")
+        frame = np.random.randint(0, 256, (60, 80, 3), dtype=np.uint8)
+        cv2.imwrite(self.input_path, frame)
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    def test_dual_halftone_vertical_stitch(self):
+        apply_halftone(
+            self.input_path, self.output_path, 20,
+            (255, 0, 0), (255, 255, 255),
+            alt_color1_rgb=(0, 0, 255), alt_color2_rgb=(0, 0, 0),
+        )
+        result = cv2.imread(self.output_path)
+        self.assertEqual(result.shape[0], 60)
+        self.assertEqual(result.shape[1], 80)
+        left_half = result[:, :40]
+        right_half = result[:, 40:]
+        self.assertTrue(np.any(np.all(left_half == (0, 0, 0), axis=-1)))
+        self.assertTrue(np.any(np.all(right_half == (255, 255, 255), axis=-1)))
+
+    def test_dual_halftone_full_canvas(self):
+        apply_halftone(
+            self.input_path, self.output_path, 20,
+            (255, 0, 0), (255, 255, 255),
+            alt_color1_rgb=(0, 255, 0), alt_color2_rgb=(255, 255, 255),
+            split_direction="vertical-full",
+        )
+        result = cv2.imread(self.output_path)
+        self.assertEqual(result.shape[0], 60)
+        self.assertEqual(result.shape[1], 160)
+
+    def test_dual_halftone_full_canvas_video(self):
+        video_path = os.path.join(self.temp_dir.name, "input.mp4")
+        output_path = os.path.join(self.temp_dir.name, "output.mp4")
+        make_test_video(video_path, width=80, height=60, frames=3, fps=10.0)
+        try:
+            apply_halftone(
+                video_path, output_path, 20,
+                (255, 0, 0), (255, 255, 255),
+                alt_color1_rgb=(0, 255, 0), alt_color2_rgb=(255, 255, 255),
+                split_direction="vertical-full",
+                no_audio=True,
+            )
+            cap = cv2.VideoCapture(output_path)
+            self.assertTrue(cap.isOpened())
+            try:
+                ret, frame = cap.read()
+                self.assertTrue(ret)
+                self.assertEqual(frame.shape[0], 60)
+                self.assertEqual(frame.shape[1], 160)
+            finally:
+                cap.release()
+        except (cv2.error, RuntimeError):
+            self.skipTest("Codec not available in this environment")
+
+    def test_dual_halftone_uses_alt_symbol_setting_without_alt_colors(self):
+        apply_halftone(
+            self.input_path, self.output_path, 20,
+            (255, 0, 0), (255, 255, 255),
+            alt_symbol_type="ring",
+            split_direction="vertical-full",
+        )
+        result = cv2.imread(self.output_path)
+        self.assertEqual(result.shape[0], 60)
+        self.assertEqual(result.shape[1], 160)
 
 
 if __name__ == "__main__":

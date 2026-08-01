@@ -5,6 +5,43 @@ All notable changes to the Siss project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-08-01
+
+### Added
+
+- `--constraints` CLI flag reads a JSON file that locks every rendering parameter (effect, colors, symbol type, symbol size, grid, and luminance-curve gamma). CLI flags override individual slots, so the same file can serve as a reproducible baseline while one parameter is varied. Validation rejects unknown keys and bad values with clear error messages.
+- `--dump-constraints` CLI flag writes the effective constraints of any run to a JSON file, capturing the resolved values so a hand-tuned run can be reused as a `--constraints` input
+- Luminance-curve gamma (`luminance_curve.gamma` in the constraints file, or passed through the halftone API). The gamma exponent biases the luminance-to-symbol-size mapping: values above 1 suppress symbol growth in dark regions; values below 1 amplify it. The default 1.0 gives a linear mapping identical to previous versions.
+- **Halftone `ring` symbol**: `--symbol_type ring` draws a hollow circle (outer radius equal to the computed symbol size, inner radius one pixel less), the outline counterpart to the filled `dot` symbol.
+- **Loss-map output** (`--loss-map PATH`): when passed alongside `--effect halftone`, emits a grayscale loss map at the same resolution as the input. Per output cell, the absolute difference between the source luminance and the luminance reproducible under the chosen grammar (symbol-size quantization). Bright marks high divergence, dark marks faithful reproduction. Video output writes a parallel video; still-image output writes a single-channel PNG.
+- **Split-view dual styles** (`--split-alt-*` flags): when `--split-view` is active, `--split-alt-color1`, `--split-alt-color2`, `--split-alt-palette`, and `--split-alt-constraints` apply a different visual style to the alternate half of the output, so one side can be noir and the other sunset. Both halves are processed with their own grammars; neither is the raw original. Supports `vertical`, `horizontal`, `vertical-full`, and `horizontal-full` modes.
+- Sample constraints file `examples/constraints.json` with a ring-hex halftone configuration at gamma 0.8
+- `docs/llm-prompt.md`: a reusable prompt for LLMs (Claude, GPT, Gemini) that describes the constraints schema, parameter semantics, design heuristics, and four worked examples so an LLM can author a visual grammar from a natural-language description
+- "Why This Exists" section in the README, positioning Siss as a co-creation instrument where an LLM authors the visual grammar (the constraints file) and deterministic code enforces it
+- Over 65 new tests covering constraints validation, precedence resolution, dump format, reloadability, gamma behavior, ring symbol rendering, loss-map computation, and integration through `main()`
+
+### Changed
+
+- `--split-view` expanded to support two modes: `vertical`/`horizontal` stitch half of the original and half of the processed frame into a single output at the original dimensions; `vertical-full`/`horizontal-full` preserve the previous behavior of placing the full original alongside the full processed result at double the width or height. The half-half mode is the new default; the full-canvas mode remains available.
+- `--symbol-size`, `--symbol-type`, and `--grid-type` argparse defaults moved from the argument parser to the resolution phase so constraints-file values can override them without breaking CLI precedence
+- `_resolve_colors` signature now accepts an optional `constraints` dict
+- `_make_halftone_processor` optionally returns a `(rendered, loss_map)` tuple; `process_video_frames` and `process_image` detect tuple returns and write the second element to a loss-map path
+- Extracted shared `SYMBOL_TYPES`, `GRID_TYPES`, and `EFFECT_TYPES` constants from three duplicate choice-list sites in `halftone.py` and `main.py` into single-source-of-truth tuples
+- Collapsed `TestHalftoneSplitView` and `TestDuotoneSplitView` duplicate test classes into a shared `_SplitViewImageTestMixin` in `tests/helpers.py`
+- Deduplicated temp-file cleanup in `merge_audio` by moving the `os.unlink` logic into a single `finally` block gated by a success flag
+- `_ns()` test helper base dict expanded to include `no_audio`, `split_view`, `constraints`, `dump_constraints`, and `export_palette_preview` with argparse-correct defaults
+
+### Fixed
+
+- Non-finite gamma values (`Infinity`, `-Infinity`, `NaN`) in constraints files are now properly rejected with a `ValueError` instead of raising an unhandled `NameError`
+- Dependency constraints in `setup.py` aligned with `requirements.txt` to address Pillow's authoritative advisory CVE-2025-48379 for the affected range `Pillow>=11.2.0,<11.3.0`, with the issue fixed in `11.3.0`
+- Upper bounds added to all runtime and dev dependencies for supply-chain reproducibility
+- Output paths are validated against parent-directory traversal (`../` segments)
+- Constraints-file loading now enforces a 1 MiB size limit, consistent with palette-file loading
+- Success messages now use `logging.info()` instead of `print()`, so `--quiet` silences all output
+- Font-loading debug logs no longer include absolute OS filesystem paths
+- ffmpeg error detail logged on audio-merge failure strips temporary file paths
+
 ## [0.8.0] - 2026-07-28
 
 ### Added

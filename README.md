@@ -19,7 +19,7 @@ and named two-color palettes.
 ## Features
 
 - **Duotone** – maps per-pixel luminance to a linear gradient between two RGB colors; `color1` is applied to dark areas, `color2` to light areas
-- **Halftone** – renders plus, asterisk, slash, or dot symbols at sizes proportional to local luminance (3×3-pixel sampled average), with independent symbol and background colors, over a square or hex-offset sampling grid
+- **Halftone** – renders plus, asterisk, slash, dot, or ring symbols at sizes proportional to local luminance (3×3-pixel sampled average), with independent symbol and background colors, over a square or hex-offset sampling grid, and an optional luminance-curve gamma for non-linear size mapping
 - **Color input** – accepts 3- and 6-digit hex strings (with or without `#`), case-insensitive CSS named colors, RGB integer triples, and named two-color palettes via `--palette`
 - **Codec selection** – probes `cv2.VideoWriter_fourcc` candidates per output format and OS at runtime; falls back through a priority list until a working codec is found
 - **Audio passthrough** – after rendering, merges the original audio track into the output with `ffmpeg` (no video re-encode); disable with `--no-audio`
@@ -103,7 +103,7 @@ Browse the built-in palettes:
 siss --list-palettes
 ```
 
-Individual `--color1` and `--color2` flags override single slots of a selected palette. Precedence: explicit flag > palette > default (red / cyan).
+Individual `--color1` and `--color2` flags override single slots of a selected palette. Precedence: explicit flag > constraints file > palette > default.
 
 ### Duotone Effect
 
@@ -161,12 +161,18 @@ Codec selection for video output is **automatic** — the tool probes available 
 - `--palette` – named two-color palette (overrides the defaults; `--color1` and `--color2` override individual slots)
 - `--list-palettes` – print available palettes and exit
 - `--symbol_size` – symbol size for halftone (default: `10`)
-- `--symbol_type` – halftone symbol shape: `plus`, `asterisk`, `slash`, or `dot` (default: `plus`)
+- `--symbol_type` – halftone symbol shape: `plus`, `asterisk`, `slash`, `dot`, or `ring` (default: `plus`)
 - `--grid_type` – halftone sampling grid: `square` or `hex` (default: `square`); `hex` staggers alternating rows by half a step for a traditional print-halftone dot screen
 - `--no-audio` – skip merging the original audio track into the output video (default: merge audio when `ffmpeg` is available)
 - `--palette-file` – path to a JSON file of custom palettes; each entry must have `"color1"` and `"color2"` keys in the same formats as `--color1`/`--color2`. Custom names override built-in ones.
 - `--export-palette-preview` – render a PNG contact sheet of every palette as labeled swatch pairs and save it to the given path; useful for design reviews
-- `--split-view` – export a before/after comparison: `vertical` places original left and processed right; `horizontal` places original above and processed below. Works with any input orientation including portrait and 9:16 vertical video
+- `--split-view` – stitch a before/after comparison into a single frame: `vertical` shows the left half of the original and the right half of the processed result at original dimensions; `horizontal` shows the top half of the original and the bottom half of the processed result. Append `-full` (`vertical-full`, `horizontal-full`) for the full-canvas mode that places the complete original alongside the complete processed frame at double the width or height. Use the `--split-alt-*` flags below to apply a different style to the alternate half, so one side can be noir and the other sunset
+- `--split-alt-constraints` – constraints file for the alternate half in `--split-view`. The alt side is processed with these settings instead of showing the original frame
+- `--split-alt-color1`, `--split-alt-color2` – override individual color slots for the alternate half
+- `--split-alt-palette` – palette for the alternate half; overridden by `--split-alt-constraints` and explicit color flags
+- `--constraints` – path to a JSON file that locks every rendering parameter (effect, colors, symbol type, grid, and luminance-curve gamma). CLI flags override individual slots, so the file acts as a reproducible baseline. Use `--dump-constraints` to generate one from a hand-tuned run.
+- `--dump-constraints` – write the effective constraints of this run to a JSON file, capturing the resolved values so they can be reused as a `--constraints` input
+- `--loss-map` – write a grayscale loss map alongside the rendered output. Each pixel encodes the absolute difference between the source luminance and the luminance reproducible under the chosen grammar, bright where the filter diverged. Halftone effect only.
 - `--verbose` (`-v`) / `--quiet` (`-q`) – control log output verbosity; `-v` for INFO, `-vv` for DEBUG, `-q` for ERROR only
 
 ## Examples
@@ -218,6 +224,49 @@ Export a palette contact sheet:
 ```bash
 siss --export-palette-preview palettes.png
 ```
+
+Run with a constraints file:
+
+```bash
+siss input.mp4 output.mp4 --constraints examples/constraints.json
+```
+
+The constraints file locks every rendering parameter in a single JSON document. CLI flags such as `--symbol_size` override individual slots at runtime, so the same file can serve as a baseline while one parameter is varied. Capture the effective constraints of any run:
+
+```bash
+siss input.mp4 output.mp4 --effect halftone --symbol_type dot --grid_type hex --dump-constraints tuned.json
+```
+
+## Why This Exists
+
+Siss is a co-creation instrument. You describe a look – a period, a mood, a
+texture – and an LLM translates that description into a deterministic
+grammar: which colors, which symbols, which grid, how the shadows bloom. Siss
+renders the grammar into pixels. The LLM never generates an image; it writes
+configuration, and the configuration is a discrete, auditable artifact. What
+the filter discards is measurable: pass `--loss-map` to emit a grayscale
+map of every cell where the grammar diverged from the source. A hundred
+grammars can be proposed in seconds and compared side by side.
+
+The workflow is simple. Describe the scene:
+
+```text
+a black-and-white 1940s cinema close-up – fog-drenched tarmac,
+chiaroscuro lighting, a farewell scene
+```
+
+Paste `docs/llm-prompt.md` into an LLM, add your scene description, and save
+the JSON it returns. Run Siss:
+
+```bash
+siss input.mp4 output.mp4 --constraints my_grammar.json
+```
+
+The LLM decides that “farewell” means near-black on near-white, `dot`
+symbols on a `hex` grid, high gamma for deep crushed shadows and sharp
+highlights. Siss enforces those decisions deterministically, the same way
+every time. You trust the LLM’s visual instincts. If a grammar misses the
+mark, you describe it differently and ask again.
 
 ## Project Structure
 

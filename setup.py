@@ -1,6 +1,7 @@
-from setuptools import setup
-from pathlib import Path
 import re
+from pathlib import Path
+
+from setuptools import setup
 
 # Single source of truth: read version from src/siss/__init__.py
 _init = (Path(__file__).parent / "src" / "siss" / "__init__.py").read_text()
@@ -36,10 +37,11 @@ setup(
     packages=["siss", "siss.colors", "siss.utils"],
     package_dir={"": "src"},
     install_requires=[
-        "opencv-python>=4.10.0",
-        "numpy>=1.20.0",
-        "tqdm>=4.60.0",
-        "Pillow>=11.0.0",
+        "opencv-python>=4.10.0,<6.0.0",
+        "numpy>=1.20.0,<3.0.0",
+        "tqdm>=4.60.0,<5.0.0",
+        "Pillow>=11.3.0,<12.0.0; python_version < '3.10'",
+        "Pillow>=12.3.0,<13.0.0; python_version >= '3.10'",
     ],
     python_requires=">=3.9",
     entry_points={
