@@ -71,7 +71,8 @@ def _mask_to_array(mask):
 
 @pytest.mark.parametrize("symbol_type,expected_zero_coords", [
     ("plus", [(2, 1), (2, 2), (2, 3), (1, 2), (3, 2)]),
-    ("dot", [(2, 2), (2, 1), (2, 3), (1, 2), (3, 2)])
+    ("dot", [(2, 2), (2, 1), (2, 3), (1, 2), (3, 2)]),
+    ("ring", [(2, 1), (2, 3), (1, 2), (3, 2)]),
 ])
 def test_draw_symbols_plus_and_dot(symbol_type, expected_zero_coords):
     mask = np.full((5, 5), 255, dtype=np.uint8)

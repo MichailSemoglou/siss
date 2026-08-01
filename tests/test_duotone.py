@@ -9,7 +9,7 @@ import cv2
 import numpy as np
 
 from siss.duotone import apply_duotone, apply_duotone_image
-from tests.helpers import make_gradient_image, make_test_video
+from tests.helpers import _SplitViewImageTestMixin, make_gradient_image, make_test_video
 
 
 class TestDuotone(unittest.TestCase):
@@ -112,7 +112,7 @@ class TestDuotoneImage(unittest.TestCase):
             apply_duotone_image(self.input_path, self.output_path, (300, 0, 0), (0, 255, 255))
 
 
-class TestDuotoneSplitView(unittest.TestCase):
+class TestDuotoneSplitView(unittest.TestCase, _SplitViewImageTestMixin):
     """End-to-end tests for duotone with --split-view."""
 
     def setUp(self):
@@ -122,55 +122,20 @@ class TestDuotoneSplitView(unittest.TestCase):
         h, w = 60, 80
         self.original = np.random.randint(0, 256, (h, w, 3), dtype=np.uint8)
         cv2.imwrite(self.input_path, self.original)
+        self.effect_func = apply_duotone
+        self.base_args = ((255, 0, 0), (0, 255, 255))
 
     def tearDown(self):
         self.temp_dir.cleanup()
 
     def test_split_view_vertical_doubles_width(self):
-        w = self.original.shape[1]
-        nosplit_path = os.path.join(self.temp_dir.name, "nosplit_v.png")
-        apply_duotone(self.input_path, nosplit_path, (255, 0, 0), (0, 255, 255))
-        duotone_render = cv2.imread(nosplit_path)
-
-        apply_duotone(self.input_path, self.output_path,
-                      (255, 0, 0), (0, 255, 255), split_direction="vertical")
-        result = cv2.imread(self.output_path)
-        self.assertEqual(result.shape[0], self.original.shape[0])
-        self.assertEqual(result.shape[1], self.original.shape[1] * 2)
-        np.testing.assert_array_equal(
-            result[:, :w], self.original,
-            err_msg="left half should equal the original image",
-        )
-        np.testing.assert_array_equal(
-            result[:, w:], duotone_render,
-            err_msg="right half should equal the duotone render",
-        )
+        self._test_split_view_vertical()
 
     def test_split_view_horizontal_doubles_height(self):
-        h = self.original.shape[0]
-        nosplit_path = os.path.join(self.temp_dir.name, "nosplit_h.png")
-        apply_duotone(self.input_path, nosplit_path, (255, 0, 0), (0, 255, 255))
-        duotone_render = cv2.imread(nosplit_path)
-
-        apply_duotone(self.input_path, self.output_path,
-                      (255, 0, 0), (0, 255, 255), split_direction="horizontal")
-        result = cv2.imread(self.output_path)
-        self.assertEqual(result.shape[0], self.original.shape[0] * 2)
-        self.assertEqual(result.shape[1], self.original.shape[1])
-        np.testing.assert_array_equal(
-            result[:h, :], self.original,
-            err_msg="top half should equal the original image",
-        )
-        np.testing.assert_array_equal(
-            result[h:, :], duotone_render,
-            err_msg="bottom half should equal the duotone render",
-        )
+        self._test_split_view_horizontal()
 
     def test_no_split_produces_same_dimensions(self):
-        apply_duotone(self.input_path, self.output_path,
-                       (255, 0, 0), (0, 255, 255))
-        result = cv2.imread(self.output_path)
-        self.assertEqual(result.shape, self.original.shape)
+        self._test_no_split_preserves_dimensions()
 
 
 if __name__ == "__main__":
