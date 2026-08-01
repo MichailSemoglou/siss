@@ -113,8 +113,10 @@ def split_view_stitch(main_frame: np.ndarray, alt_frame: np.ndarray, split_direc
         )
     elif split_direction == "vertical-full":
         return np.concatenate((alt_frame, main_frame), axis=1)
-    else:  # horizontal-full
+    elif split_direction == "horizontal-full":
         return np.concatenate((alt_frame, main_frame), axis=0)
+    else:
+        raise ValueError(f"Unsupported split_direction: {split_direction!r}")
 
 
 def process_image(image_path: str, output_path: str, process_function: Callable[..., Any], **kwargs: Any) -> None:
@@ -127,7 +129,10 @@ def process_image(image_path: str, output_path: str, process_function: Callable[
         process_function (callable): Function to apply to the image
             The function should take a frame and return a processed frame
         **kwargs: Additional arguments. Recognised keys:
-            split_direction (str): 'vertical' or 'horizontal' split view
+            split_direction (str): 'vertical', 'horizontal',
+                'vertical-full', or 'horizontal-full'. The -full modes
+                double one output dimension (width for vertical-full,
+                height for horizontal-full).
             loss_map_path (str): path for an optional loss-map image
     """
     frame = cv2.imread(image_path)
@@ -183,7 +188,9 @@ def process_video_frames(video_path: str, output_path: str, process_function: Ca
             When a ``loss_map_path`` kwarg is present, the function may
             return a ``(rendered, loss_map)`` tuple instead of a single
             frame.
-        split_direction (str): 'vertical' or 'horizontal' split view
+        split_direction (str): 'vertical', 'horizontal', 'vertical-full',
+            or 'horizontal-full'. The -full modes double one output
+            dimension.
         **kwargs: Recognised keys include ``loss_map_path`` (str).
 
     Example:
@@ -248,9 +255,7 @@ def process_video_frames(video_path: str, output_path: str, process_function: Ca
             else:
                 processed_frame = processed
 
-            if split_direction and split_direction.endswith("-full"):
-                pass
-            elif not skip_split_concat:
+            if not skip_split_concat and not (split_direction and split_direction.endswith("-full")):
                 expected_shape = (height, width)
                 if processed_frame.shape[:2] != expected_shape:
                     processed_frame = cv2.resize(
