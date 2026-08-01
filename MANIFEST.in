@@ -2,5 +2,10 @@ include description.md
 include LICENSE
 include README.md
 include CHANGELOG.md
+include CITATION.cff
+include SECURITY.md
+include .zenodo.json
+include docs/llm-prompt.md
+include examples/constraints.json
 include src/siss/__init__.py
 include src/siss/py.typed
