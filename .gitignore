@@ -237,6 +237,19 @@ Thumbs.db
 
 # Local roadmap
 /ROADMAP.md
+/ACADEMIA_ROADMAP.md
+
+# arXiv paper files (local development only)
+/arxiv/
+
+# Phase P0 research artifacts (local development only)
+/p0/
+
+# Research examples (local development only)
+/examples/research/
+
+# Metrics and paper experiments (local development only)
+/tests/test_metrics.py
 
 # Kilo configuration (local development only)
 kilo.json

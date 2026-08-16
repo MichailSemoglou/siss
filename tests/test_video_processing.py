@@ -20,6 +20,7 @@ import numpy as np
 
 from siss.utils.video_processing import (
     _safe_int,
+    extract_frame,
     get_video_properties,
     is_image_file,
     load_video,
@@ -28,6 +29,24 @@ from siss.utils.video_processing import (
     process_video_frames,
 )
 from tests.helpers import make_test_video
+
+
+def _write_marker_video(path, frames, marked_index, marker_color):
+    """Write a synthetic video with one identifiable marker frame."""
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    writer = cv2.VideoWriter(path, fourcc, 30.0, (160, 120))
+    if not writer.isOpened():
+        writer.release()
+        raise unittest.SkipTest("mp4v codec not available in this environment")
+
+    for index in range(frames):
+        frame = np.zeros((120, 160, 3), dtype=np.uint8)
+        if index == marked_index:
+            frame[20:40, 20:40] = marker_color
+        writer.write(frame)
+
+    writer.release()
+
 
 # ---------------------------------------------------------------------------
 # is_image_file
@@ -257,6 +276,82 @@ class TestProcessMedia(unittest.TestCase):
             process_media("in.png", "out.png", lambda f: f)
         image_fn.assert_called_once()
         video_fn.assert_not_called()
+
+    def test_preview_frame_writes_single_output_image(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_path = os.path.join(tmpdir, "clip.mp4")
+            output_path = os.path.join(tmpdir, "preview.png")
+            make_test_video(input_path, frames=5)
+
+            process_media(input_path, output_path, lambda frame: frame, preview_frame=2)
+
+            self.assertTrue(os.path.exists(output_path))
+            output = cv2.imread(output_path)
+            self.assertIsNotNone(output)
+            self.assertEqual(output.shape[0], 120)
+            self.assertEqual(output.shape[1], 160)
+
+    def test_preview_frame_ignores_split_direction(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_path = os.path.join(tmpdir, "clip.mp4")
+            preview_output = os.path.join(tmpdir, "preview.png")
+            make_test_video(input_path, frames=5)
+
+            process_media(
+                input_path,
+                os.path.join(tmpdir, "out.mov"),
+                lambda frame: frame,
+                preview_frame=2,
+                preview_output_path=preview_output,
+                split_direction="vertical",
+            )
+
+            self.assertTrue(os.path.exists(preview_output))
+
+    def test_preview_frame_ignores_loss_map_path(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_path = os.path.join(tmpdir, "clip.mp4")
+            preview_output = os.path.join(tmpdir, "preview.png")
+            make_test_video(input_path, frames=5)
+
+            process_media(
+                input_path,
+                os.path.join(tmpdir, "out.mov"),
+                lambda frame: frame,
+                preview_frame=2,
+                preview_output_path=preview_output,
+                loss_map_path=os.path.join(tmpdir, "loss.png"),
+            )
+
+            self.assertTrue(os.path.exists(preview_output))
+
+
+class TestExtractFrame(unittest.TestCase):
+    """extract_frame() selects a single frame from a video input."""
+
+    def test_middle_frame_is_selected(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_path = os.path.join(tmpdir, "clip.mp4")
+            _write_marker_video(input_path, frames=5, marked_index=2, marker_color=[0, 255, 0])
+
+            frame = extract_frame(input_path, "middle")
+
+            self.assertIsInstance(frame, np.ndarray)
+            self.assertEqual(frame.shape[:2], (120, 160))
+            self.assertGreaterEqual(int(frame[20, 20, 1]), 200)
+            self.assertLessEqual(int(frame[20, 20, 0]), 50)
+
+    def test_numeric_string_frame_is_selected(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_path = os.path.join(tmpdir, "clip.mp4")
+            _write_marker_video(input_path, frames=60, marked_index=48, marker_color=[255, 0, 0])
+
+            frame = extract_frame(input_path, "48")
+
+            self.assertIsInstance(frame, np.ndarray)
+            self.assertEqual(frame.shape[:2], (120, 160))
+            self.assertGreaterEqual(int(frame[20, 20, 0]), 200)
+            self.assertLessEqual(int(frame[20, 20, 1]), 50)
 
     def test_video_extension_routes_to_process_video_frames(self):
         with mock.patch(

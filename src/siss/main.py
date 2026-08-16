@@ -18,6 +18,7 @@ import json
 import logging
 import os
 import sys
+from argparse import Namespace
 from typing import Any, Dict, List, Optional, Tuple
 
 from .colors import (
@@ -98,7 +99,7 @@ def resolve_color_arg(
     return parse_color(value)
 
 
-def parse_arguments():
+def parse_arguments() -> Namespace:
     """
     Parse command line arguments.
 
@@ -196,6 +197,30 @@ def parse_arguments():
         default=None,
         metavar="PATH",
         help="Render a PNG contact sheet of every palette and save it to PATH.",
+    )
+
+    parser.add_argument(
+        "--preview-frame",
+        type=str,
+        default=None,
+        metavar="SPEC",
+        help=(
+            "Process a single frame from a video input. Accepts an integer "
+            "frame index or 'middle'. When the main output path is an image, "
+            "the processed frame is written there. Use --preview-output to save "
+            "to a separate file."
+        ),
+    )
+
+    parser.add_argument(
+        "--preview-output",
+        type=str,
+        default=None,
+        metavar="PATH",
+        help=(
+            "Path to save a single preview frame when --preview-frame is used. "
+            "If omitted and the main output path is an image file, that path is used."
+        ),
     )
 
     parser.add_argument(
@@ -424,7 +449,7 @@ _CONSTRAINTS_KEYS = frozenset({
 })
 
 
-def _make_alt_args(args):
+def _make_alt_args(args: Namespace) -> Namespace:
     """Build a minimal namespace carrying the alt split-view overrides."""
     ns = argparse.Namespace()
     ns.palette = getattr(args, "split_alt_palette", None)
@@ -530,7 +555,7 @@ def _load_and_validate_constraints(path: str) -> Dict[str, Any]:
     return data
 
 
-def _resolve_params(args, constraints, custom_palettes):
+def _resolve_params(args: Namespace, constraints: Optional[Dict[str, Any]], custom_palettes: Optional[Dict[str, Tuple[int, int, int]]]) -> Dict[str, Any]:
     """
     Resolve all rendering parameters with full precedence.
 
@@ -581,7 +606,7 @@ def _resolve_params(args, constraints, custom_palettes):
     }
 
 
-def _dump_effective_constraints(params, path):
+def _dump_effective_constraints(params: Dict[str, Any], path: str) -> None:
     """
     Write the resolved rendering parameters as a constraints JSON file.
 
@@ -617,7 +642,7 @@ def _dump_effective_constraints(params, path):
         raise ValueError(f"Cannot write constraints file: {e}") from e
 
 
-def _validate_args_and_paths(args):
+def _validate_args_and_paths(args: Namespace) -> str:
     """
     Validate that required args are present and return the resolved input path.
 
@@ -657,7 +682,14 @@ def _validate_args_and_paths(args):
     return input_path
 
 
-def _dispatch_effect(args, input_path, color1_rgb, color2_rgb, custom_palettes=None, gamma=_GAMMA_DEFAULT):
+def _dispatch_effect(
+    args: Namespace,
+    input_path: str,
+    color1_rgb: Tuple[int, int, int],
+    color2_rgb: Tuple[int, int, int],
+    custom_palettes: Optional[Dict[str, Tuple[int, int, int]]] = None,
+    gamma: float = _GAMMA_DEFAULT,
+) -> None:
     """
     Dispatch to the selected effect entry point.
 
@@ -703,6 +735,8 @@ def _dispatch_effect(args, input_path, color1_rgb, color2_rgb, custom_palettes=N
             split_direction=split_direction,
             alt_color1_rgb=alt_color1_rgb,
             alt_color2_rgb=alt_color2_rgb,
+            preview_frame=getattr(args, "preview_frame", None),
+            preview_output_path=getattr(args, "preview_output", None),
         )
     elif args.effect == "halftone":
         apply_halftone(
@@ -721,11 +755,13 @@ def _dispatch_effect(args, input_path, color1_rgb, color2_rgb, custom_palettes=N
             ),
             alt_color1_rgb=alt_color1_rgb,
             alt_color2_rgb=alt_color2_rgb,
+            preview_frame=getattr(args, "preview_frame", None),
+            preview_output_path=getattr(args, "preview_output", None),
             **alt_kwargs,
         )
 
 
-def _configure_logging(args) -> None:
+def _configure_logging(args: Namespace) -> None:
     """Set up structured logging based on --verbose and --quiet flags."""
     if args.quiet:
         level = logging.ERROR
@@ -744,7 +780,7 @@ def _configure_logging(args) -> None:
     )
 
 
-def main():
+def main() -> int:
     """Main function to process command line arguments and apply video effects."""
     args = parse_arguments()
     _configure_logging(args)

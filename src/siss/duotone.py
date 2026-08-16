@@ -1,7 +1,7 @@
 """
 Module for applying duotone color effects to videos and still images.
 """
-from typing import Callable, Optional, Tuple
+from typing import Callable, Optional, Tuple, Union
 
 import cv2
 import numpy as np
@@ -33,7 +33,7 @@ def _make_duotone_processor(
     return _duotone_frame
 
 
-def apply_duotone(video_path: str, output_path: str, color1_rgb: Tuple[int, int, int], color2_rgb: Tuple[int, int, int], *, no_audio: bool = False, split_direction: Optional[str] = None, alt_color1_rgb: Optional[Tuple[int, int, int]] = None, alt_color2_rgb: Optional[Tuple[int, int, int]] = None) -> None:
+def apply_duotone(video_path: str, output_path: str, color1_rgb: Tuple[int, int, int], color2_rgb: Tuple[int, int, int], *, no_audio: bool = False, split_direction: Optional[str] = None, alt_color1_rgb: Optional[Tuple[int, int, int]] = None, alt_color2_rgb: Optional[Tuple[int, int, int]] = None, preview_frame: Optional[Union[int, str]] = None, preview_output_path: Optional[str] = None) -> None:
     """
     Apply duotone color effect to a video or still image.
 
@@ -72,11 +72,13 @@ def apply_duotone(video_path: str, output_path: str, color1_rgb: Tuple[int, int,
             )
 
         process_media(video_path, output_path, _composed, no_audio=no_audio,
-                       split_direction=direction, _skip_split_concat=True)
+                       split_direction=direction, _skip_split_concat=True,
+                       preview_frame=preview_frame, preview_output_path=preview_output_path)
     else:
         process_media(
             video_path, output_path, main_proc,
             no_audio=no_audio, split_direction=split_direction,
+            preview_frame=preview_frame, preview_output_path=preview_output_path,
         )
 
 
