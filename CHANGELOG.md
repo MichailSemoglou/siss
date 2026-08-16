@@ -5,6 +5,17 @@ All notable changes to the Siss project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-08-16
+
+### Added
+
+- `--preview-frame` and `--preview-output` CLI flags for processing a single frame from a video input and saving it as a still image for rapid iteration without waiting for a full render.
+- Preview-frame support accepts a numeric frame index, a numeric string such as `48`, or the `middle` keyword, and falls back to a grab-loop when frame seeking is unreliable for a given codec.
+
+### Changed
+
+- The preview workflow uses the same duotone and halftone processors as full renders, so designers can inspect one frame quickly before committing to a full video export.
+
 ## [1.0.0] - 2026-08-01
 
 ### Added

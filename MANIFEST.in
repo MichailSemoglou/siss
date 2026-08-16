@@ -8,4 +8,5 @@ include .zenodo.json
 include docs/llm-prompt.md
 include examples/constraints.json
 include src/siss/__init__.py
+include src/siss/metrics.py
 include src/siss/py.typed

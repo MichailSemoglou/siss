@@ -270,6 +270,8 @@ def apply_halftone(
     alt_symbol_size: Optional[int] = None,
     alt_grid_type: Optional[str] = None,
     alt_gamma: Optional[float] = None,
+    preview_frame: Optional[Union[int, str]] = None,
+    preview_output_path: Optional[str] = None,
 ) -> None:
     """
     Apply halftone pattern effect to a video or still image.
@@ -342,12 +344,14 @@ def apply_halftone(
             video_path, output_path, _composed,
             no_audio=no_audio, split_direction=direction,
             loss_map_path=loss_map_path, _skip_split_concat=True,
+            preview_frame=preview_frame, preview_output_path=preview_output_path,
         )
     else:
         process_media(
             video_path, output_path, main_proc,
             no_audio=no_audio, split_direction=split_direction,
             loss_map_path=loss_map_path,
+            preview_frame=preview_frame, preview_output_path=preview_output_path,
         )
 
 

@@ -6,7 +6,7 @@ loading videos and saving processed results.
 """
 import logging
 import os
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional, Union
 
 import cv2
 import numpy as np
@@ -54,6 +54,68 @@ def get_video_properties(video_capture: cv2.VideoCapture) -> Dict[str, Any]:
         'height': _safe_int(video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT)),
         'frame_count': _safe_int(video_capture.get(cv2.CAP_PROP_FRAME_COUNT)),
     }
+
+
+def _read_frame_at(cap: cv2.VideoCapture, frame_index: int) -> tuple[bool, Optional[np.ndarray]]:
+    """Seek to a frame index and return the frame if it can be read."""
+    if not cap.set(cv2.CAP_PROP_POS_FRAMES, float(frame_index)):
+        return False, None
+    ret, frame = cap.read()
+    if ret:
+        return True, frame
+    return False, None
+
+
+def extract_frame(video_path: str, frame_selector: Union[int, str]) -> np.ndarray:
+    """Extract a single frame from a video input.
+
+    ``frame_selector`` accepts either an integer frame index, a numeric string
+    like ``"48"``, or the strings ``"middle"``, ``"first"``, and ``"last"``.
+    For keyframe-only codecs, the function falls back to a simple grab loop
+    from the start of the video until the requested frame is reached.
+    """
+    cap = load_video(video_path)
+    try:
+        props = get_video_properties(cap)
+        frame_count = props["frame_count"]
+        if isinstance(frame_selector, str):
+            selector = frame_selector.strip().lower()
+            if selector == "middle":
+                target = max(0, (frame_count - 1) // 2) if frame_count > 0 else 0
+            elif selector in {"first", "start", "0"}:
+                target = 0
+            elif selector in {"last", "end"}:
+                target = max(0, frame_count - 1) if frame_count > 0 else 0
+            else:
+                try:
+                    target = int(selector)
+                except ValueError as exc:
+                    raise ValueError(f"Unsupported preview frame selector: {frame_selector!r}") from exc
+        elif isinstance(frame_selector, int):
+            target = frame_selector
+        else:
+            raise TypeError("frame_selector must be an int, a numeric string, or 'middle'")
+
+        if target < 0:
+            raise ValueError("preview frame index must be non-negative")
+        if frame_count > 0 and target >= frame_count:
+            target = max(0, frame_count - 1)
+
+        ret, frame = _read_frame_at(cap, target)
+        if ret and frame is not None:
+            return frame
+
+        cap.set(cv2.CAP_PROP_POS_FRAMES, 0.0)
+        for _ in range(target):
+            ret, _ = cap.read()
+            if not ret:
+                raise RuntimeError(f"Could not read preview frame {target} from {video_path}")
+        ret, frame = cap.read()
+        if not ret or frame is None:
+            raise RuntimeError(f"Could not read preview frame {target} from {video_path}")
+        return frame
+    finally:
+        cap.release()
 
 
 def _safe_int(value: float) -> int:
@@ -315,10 +377,64 @@ def process_media(input_path: str, output_path: str, process_function: Callable[
         no_audio (bool): When True, skip the ffmpeg audio-merge step
         **kwargs: Additional arguments to pass to the process_function
     """
+    preview_frame = kwargs.pop("preview_frame", None)
+    preview_output_path = kwargs.pop("preview_output_path", None)
+    if preview_output_path is not None and preview_frame is None:
+        raise ValueError("preview_output_path requires preview_frame")
+    split_direction = kwargs.pop("split_direction", None)
+    skip_split_concat = kwargs.pop("_skip_split_concat", False)
+    if preview_frame is not None:
+        preview_path = preview_output_path or output_path
+        if not is_image_file(preview_path):
+            raise ValueError(
+                f"Preview output path must be an image file, got {preview_path!r}"
+            )
+        frame = extract_frame(input_path, preview_frame)
+        preview_kwargs = dict(kwargs)
+        preview_kwargs.pop("loss_map_path", None)
+        processed = process_function(frame, **preview_kwargs)
+        if isinstance(processed, tuple):
+            processed_frame = processed[0]
+        else:
+            processed_frame = processed
+        if split_direction and not skip_split_concat:
+            if split_direction.endswith("-full"):
+                axis = 1 if split_direction.startswith("vertical") else 0
+                processed_frame = np.concatenate((frame, processed_frame), axis=axis)
+            elif split_direction == "vertical":
+                w = frame.shape[1]
+                half = w // 2
+                processed_frame = np.concatenate((frame[:, :half], processed_frame[:, half:]), axis=1)
+            else:
+                h = frame.shape[0]
+                half = h // 2
+                processed_frame = np.concatenate((frame[:half, :], processed_frame[half:, :]), axis=0)
+        output_dir = os.path.dirname(preview_path)
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
+        success = cv2.imwrite(preview_path, processed_frame)
+        if not success:
+            raise RuntimeError(f"Failed to write preview frame: {preview_path}")
+        _log.info("Preview frame saved to %s", preview_path)
+        return
+
     if is_image_file(output_path):
-        return process_image(input_path, output_path, process_function, **kwargs)
-    split = kwargs.pop("split_direction", None)
-    process_video_frames(input_path, output_path, process_function, split_direction=split, **kwargs)
+        return process_image(
+            input_path,
+            output_path,
+            process_function,
+            split_direction=split_direction,
+            _skip_split_concat=skip_split_concat,
+            **kwargs,
+        )
+    process_video_frames(
+        input_path,
+        output_path,
+        process_function,
+        split_direction=split_direction,
+        _skip_split_concat=skip_split_concat,
+        **kwargs,
+    )
     if not no_audio:
         from ..audio import merge_audio
         merge_audio(input_path, output_path)

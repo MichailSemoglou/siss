@@ -9,6 +9,7 @@ These focus on the pure (non-video) logic:
 The video-rendering paths in main() are exercised via the existing
 test_duotone / test_halftone suites and manual smoke tests.
 """
+import importlib
 import os
 import unittest
 from argparse import Namespace
@@ -18,6 +19,7 @@ from siss.main import (
     _configure_logging,
     _dispatch_effect,
     _resolve_colors,
+    _validate_args_and_paths,
     main,
     resolve_color_arg,
     validate_file_path,
@@ -157,6 +159,10 @@ class TestResolveColorsCustomPalettes(unittest.TestCase):
 class TestMainEntryPoint(unittest.TestCase):
     """Tests for the main() function's control flow (no video rendering)."""
 
+    def test_module_entrypoint_imports(self):
+        module = importlib.import_module("siss.__main__")
+        self.assertTrue(callable(module.main))
+
     def test_list_palettes_prints_and_exits_zero(self):
         with mock.patch("builtins.print") as mock_print:
             with mock.patch("sys.argv", ["siss", "--list-palettes"]):
@@ -183,6 +189,18 @@ class TestMainEntryPoint(unittest.TestCase):
         ):
             rc = main()
         self.assertEqual(rc, 1)
+
+    def test_preview_only_inputs_accept_preview_output(self):
+        args = _ns(
+            input=__file__,
+            output=None,
+            effect="duotone",
+            preview_frame="2",
+            preview_output="preview.png",
+        )
+        input_path = _validate_args_and_paths(args)
+        self.assertEqual(input_path, __file__)
+        self.assertIsNone(args.output)
 
 
 class TestValidateFilePath(unittest.TestCase):
@@ -353,6 +371,27 @@ class TestMainVideoEffects(unittest.TestCase):
         _, kwargs = mock_ht.call_args
         self.assertEqual(kwargs.get("symbol_type"), "dot")
         self.assertEqual(kwargs.get("grid_type"), "hex")
+
+    def test_halftone_square_grid_and_asterisk_symbol_forwarded(self):
+        with mock.patch("siss.main.apply_halftone") as mock_ht:
+            with mock.patch(
+                "sys.argv",
+                [
+                    "siss",
+                    self.input_path,
+                    self.output_path,
+                    "--effect",
+                    "halftone",
+                    "--symbol_type",
+                    "asterisk",
+                    "--grid_type",
+                    "square",
+                ],
+            ):
+                main()
+        _, kwargs = mock_ht.call_args
+        self.assertEqual(kwargs.get("symbol_type"), "asterisk")
+        self.assertEqual(kwargs.get("grid_type"), "square")
 
     def test_halftone_ring_symbol_forwarded(self):
         with mock.patch("siss.main.apply_halftone") as mock_ht:

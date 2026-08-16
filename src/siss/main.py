@@ -18,6 +18,7 @@ import json
 import logging
 import os
 import sys
+from argparse import Namespace
 from typing import Any, Dict, List, Optional, Tuple
 
 from .colors import (
@@ -32,6 +33,10 @@ from .halftone import GRID_TYPES, SYMBOL_TYPES, _validate_gamma, apply_halftone
 
 _GAMMA_DEFAULT = 1.0
 EFFECT_TYPES = ("duotone", "halftone")
+
+RGB = Tuple[int, int, int]
+PalettePair = Tuple[RGB, RGB]
+PaletteMap = Dict[str, PalettePair]
 
 
 def validate_file_path(file_path: str, check_exists: bool = True) -> str:
@@ -98,7 +103,7 @@ def resolve_color_arg(
     return parse_color(value)
 
 
-def parse_arguments():
+def parse_arguments() -> Namespace:
     """
     Parse command line arguments.
 
@@ -196,6 +201,30 @@ def parse_arguments():
         default=None,
         metavar="PATH",
         help="Render a PNG contact sheet of every palette and save it to PATH.",
+    )
+
+    parser.add_argument(
+        "--preview-frame",
+        type=str,
+        default=None,
+        metavar="SPEC",
+        help=(
+            "Process a single frame from a video input. Accepts an integer "
+            "frame index or 'middle'. When the main output path is an image, "
+            "the processed frame is written there. Use --preview-output to save "
+            "to a separate file."
+        ),
+    )
+
+    parser.add_argument(
+        "--preview-output",
+        type=str,
+        default=None,
+        metavar="PATH",
+        help=(
+            "Path to save a single preview frame when --preview-frame is used. "
+            "If omitted and the main output path is an image file, that path is used."
+        ),
     )
 
     parser.add_argument(
@@ -367,10 +396,10 @@ def parse_arguments():
 
 
 def _resolve_colors(
-    args,
-    custom_palettes=None,
-    constraints=None,
-) -> Tuple[Tuple[int, int, int], Tuple[int, int, int]]:
+    args: Namespace,
+    custom_palettes: Optional[PaletteMap] = None,
+    constraints: Optional[Dict[str, Any]] = None,
+) -> Tuple[RGB, RGB]:
     """
     Resolve the final (color1_rgb, color2_rgb) pair.
 
@@ -424,7 +453,7 @@ _CONSTRAINTS_KEYS = frozenset({
 })
 
 
-def _make_alt_args(args):
+def _make_alt_args(args: Namespace) -> Namespace:
     """Build a minimal namespace carrying the alt split-view overrides."""
     ns = argparse.Namespace()
     ns.palette = getattr(args, "split_alt_palette", None)
@@ -530,7 +559,11 @@ def _load_and_validate_constraints(path: str) -> Dict[str, Any]:
     return data
 
 
-def _resolve_params(args, constraints, custom_palettes):
+def _resolve_params(
+    args: Namespace,
+    constraints: Optional[Dict[str, Any]],
+    custom_palettes: Optional[PaletteMap],
+) -> Dict[str, Any]:
     """
     Resolve all rendering parameters with full precedence.
 
@@ -581,7 +614,7 @@ def _resolve_params(args, constraints, custom_palettes):
     }
 
 
-def _dump_effective_constraints(params, path):
+def _dump_effective_constraints(params: Dict[str, Any], path: str) -> None:
     """
     Write the resolved rendering parameters as a constraints JSON file.
 
@@ -617,11 +650,13 @@ def _dump_effective_constraints(params, path):
         raise ValueError(f"Cannot write constraints file: {e}") from e
 
 
-def _validate_args_and_paths(args):
+def _validate_args_and_paths(args: Namespace) -> str:
     """
     Validate that required args are present and return the resolved input path.
 
-    Creates the output directory if it does not exist.
+    Creates the output directory if it does not exist for a normal render.
+    Preview-only runs can omit the main output path when both preview flags
+    are supplied.
 
     Returns
     -------
@@ -638,10 +673,14 @@ def _validate_args_and_paths(args):
     missing = []
     if not args.input:
         missing.append("input")
-    if not args.output:
-        missing.append("output")
     if not args.effect:
         missing.append("--effect")
+
+    preview_frame = getattr(args, "preview_frame", None)
+    preview_output = getattr(args, "preview_output", None)
+    if not args.output and not (preview_frame and preview_output):
+        missing.append("output")
+
     if missing:
         raise ValueError(
             "Missing required argument(s): "
@@ -650,14 +689,22 @@ def _validate_args_and_paths(args):
         )
 
     input_path = validate_file_path(args.input, check_exists=True)
-    args.output = _validate_output_path(args.output)
-    output_dir = os.path.dirname(args.output)
-    if output_dir:
-        os.makedirs(output_dir, exist_ok=True)
+    if args.output is not None:
+        args.output = _validate_output_path(args.output)
+        output_dir = os.path.dirname(args.output)
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
     return input_path
 
 
-def _dispatch_effect(args, input_path, color1_rgb, color2_rgb, custom_palettes=None, gamma=_GAMMA_DEFAULT):
+def _dispatch_effect(
+    args: Namespace,
+    input_path: str,
+    color1_rgb: RGB,
+    color2_rgb: RGB,
+    custom_palettes: Optional[PaletteMap] = None,
+    gamma: float = _GAMMA_DEFAULT,
+) -> None:
     """
     Dispatch to the selected effect entry point.
 
@@ -674,7 +721,7 @@ def _dispatch_effect(args, input_path, color1_rgb, color2_rgb, custom_palettes=N
         alt_constraints = _load_and_validate_constraints(args.split_alt_constraints)
     alt_color1_rgb = None
     alt_color2_rgb = None
-    alt_kwargs = {}
+    alt_kwargs: Dict[str, Any] = {}
     if alt_constraints or getattr(args, "split_alt_color1", None) or getattr(args, "split_alt_color2", None) or getattr(args, "split_alt_palette", None):
         alt_color1_rgb, alt_color2_rgb = _resolve_colors(
             _make_alt_args(args), custom_palettes=custom_palettes, constraints=alt_constraints,
@@ -703,6 +750,8 @@ def _dispatch_effect(args, input_path, color1_rgb, color2_rgb, custom_palettes=N
             split_direction=split_direction,
             alt_color1_rgb=alt_color1_rgb,
             alt_color2_rgb=alt_color2_rgb,
+            preview_frame=getattr(args, "preview_frame", None),
+            preview_output_path=getattr(args, "preview_output", None),
         )
     elif args.effect == "halftone":
         apply_halftone(
@@ -721,11 +770,16 @@ def _dispatch_effect(args, input_path, color1_rgb, color2_rgb, custom_palettes=N
             ),
             alt_color1_rgb=alt_color1_rgb,
             alt_color2_rgb=alt_color2_rgb,
-            **alt_kwargs,
+            preview_frame=getattr(args, "preview_frame", None),
+            preview_output_path=getattr(args, "preview_output", None),
+            alt_symbol_type=alt_kwargs.get("alt_symbol_type"),
+            alt_symbol_size=alt_kwargs.get("alt_symbol_size"),
+            alt_grid_type=alt_kwargs.get("alt_grid_type"),
+            alt_gamma=alt_kwargs.get("alt_gamma"),
         )
 
 
-def _configure_logging(args) -> None:
+def _configure_logging(args: Namespace) -> None:
     """Set up structured logging based on --verbose and --quiet flags."""
     if args.quiet:
         level = logging.ERROR
@@ -744,7 +798,7 @@ def _configure_logging(args) -> None:
     )
 
 
-def main():
+def main() -> int:
     """Main function to process command line arguments and apply video effects."""
     args = parse_arguments()
     _configure_logging(args)
