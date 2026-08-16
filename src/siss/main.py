@@ -34,6 +34,10 @@ from .halftone import GRID_TYPES, SYMBOL_TYPES, _validate_gamma, apply_halftone
 _GAMMA_DEFAULT = 1.0
 EFFECT_TYPES = ("duotone", "halftone")
 
+RGB = Tuple[int, int, int]
+PalettePair = Tuple[RGB, RGB]
+PaletteMap = Dict[str, PalettePair]
+
 
 def validate_file_path(file_path: str, check_exists: bool = True) -> str:
     """
@@ -392,10 +396,10 @@ def parse_arguments() -> Namespace:
 
 
 def _resolve_colors(
-    args,
-    custom_palettes=None,
-    constraints=None,
-) -> Tuple[Tuple[int, int, int], Tuple[int, int, int]]:
+    args: Namespace,
+    custom_palettes: Optional[PaletteMap] = None,
+    constraints: Optional[Dict[str, Any]] = None,
+) -> Tuple[RGB, RGB]:
     """
     Resolve the final (color1_rgb, color2_rgb) pair.
 
@@ -555,7 +559,11 @@ def _load_and_validate_constraints(path: str) -> Dict[str, Any]:
     return data
 
 
-def _resolve_params(args: Namespace, constraints: Optional[Dict[str, Any]], custom_palettes: Optional[Dict[str, Tuple[int, int, int]]]) -> Dict[str, Any]:
+def _resolve_params(
+    args: Namespace,
+    constraints: Optional[Dict[str, Any]],
+    custom_palettes: Optional[PaletteMap],
+) -> Dict[str, Any]:
     """
     Resolve all rendering parameters with full precedence.
 
@@ -646,7 +654,9 @@ def _validate_args_and_paths(args: Namespace) -> str:
     """
     Validate that required args are present and return the resolved input path.
 
-    Creates the output directory if it does not exist.
+    Creates the output directory if it does not exist for a normal render.
+    Preview-only runs can omit the main output path when both preview flags
+    are supplied.
 
     Returns
     -------
@@ -663,10 +673,14 @@ def _validate_args_and_paths(args: Namespace) -> str:
     missing = []
     if not args.input:
         missing.append("input")
-    if not args.output:
-        missing.append("output")
     if not args.effect:
         missing.append("--effect")
+
+    preview_frame = getattr(args, "preview_frame", None)
+    preview_output = getattr(args, "preview_output", None)
+    if not args.output and not (preview_frame and preview_output):
+        missing.append("output")
+
     if missing:
         raise ValueError(
             "Missing required argument(s): "
@@ -675,19 +689,20 @@ def _validate_args_and_paths(args: Namespace) -> str:
         )
 
     input_path = validate_file_path(args.input, check_exists=True)
-    args.output = _validate_output_path(args.output)
-    output_dir = os.path.dirname(args.output)
-    if output_dir:
-        os.makedirs(output_dir, exist_ok=True)
+    if args.output is not None:
+        args.output = _validate_output_path(args.output)
+        output_dir = os.path.dirname(args.output)
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
     return input_path
 
 
 def _dispatch_effect(
     args: Namespace,
     input_path: str,
-    color1_rgb: Tuple[int, int, int],
-    color2_rgb: Tuple[int, int, int],
-    custom_palettes: Optional[Dict[str, Tuple[int, int, int]]] = None,
+    color1_rgb: RGB,
+    color2_rgb: RGB,
+    custom_palettes: Optional[PaletteMap] = None,
     gamma: float = _GAMMA_DEFAULT,
 ) -> None:
     """
@@ -706,7 +721,7 @@ def _dispatch_effect(
         alt_constraints = _load_and_validate_constraints(args.split_alt_constraints)
     alt_color1_rgb = None
     alt_color2_rgb = None
-    alt_kwargs = {}
+    alt_kwargs: Dict[str, Any] = {}
     if alt_constraints or getattr(args, "split_alt_color1", None) or getattr(args, "split_alt_color2", None) or getattr(args, "split_alt_palette", None):
         alt_color1_rgb, alt_color2_rgb = _resolve_colors(
             _make_alt_args(args), custom_palettes=custom_palettes, constraints=alt_constraints,
@@ -757,7 +772,10 @@ def _dispatch_effect(
             alt_color2_rgb=alt_color2_rgb,
             preview_frame=getattr(args, "preview_frame", None),
             preview_output_path=getattr(args, "preview_output", None),
-            **alt_kwargs,
+            alt_symbol_type=alt_kwargs.get("alt_symbol_type"),
+            alt_symbol_size=alt_kwargs.get("alt_symbol_size"),
+            alt_grid_type=alt_kwargs.get("alt_grid_type"),
+            alt_gamma=alt_kwargs.get("alt_gamma"),
         )
 
 

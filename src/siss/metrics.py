@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import List, Sequence
+from typing import Any, List, Sequence
 
 import cv2
 import numpy as np
@@ -57,8 +57,9 @@ def compute_loss_map(reference: np.ndarray, candidate: np.ndarray) -> np.ndarray
     if ref.shape != cand.shape:
         raise ValueError(f"Image shapes differ: {ref.shape} vs {cand.shape}")
 
-    diff = np.abs(ref - cand).astype(np.uint8)
-    return diff
+    diff = np.abs(ref - cand)
+    diff = np.clip(diff, 0.0, 255.0)
+    return diff.astype(np.uint8)
 
 
 def write_benchmark_report(
@@ -67,12 +68,12 @@ def write_benchmark_report(
     candidates: Sequence[np.ndarray],
     loss_maps: Sequence[np.ndarray],
     output_path: str | Path | None = None,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     """Write a machine-readable benchmark report for a set of renders."""
     if not (len(names) == len(references) == len(candidates) == len(loss_maps)):
         raise ValueError("names, references, candidates, and loss_maps must have the same length")
 
-    items: List[dict[str, object]] = []
+    items: List[dict[str, Any]] = []
     for name, reference, candidate, loss_map in zip(names, references, candidates, loss_maps):
         metrics = compute_metrics(reference, candidate)
         item = {
@@ -88,7 +89,7 @@ def write_benchmark_report(
                 item[key] = None
         items.append(item)
 
-    report = {
+    report: dict[str, object] = {
         "generated_by": "siss.metrics.write_benchmark_report",
         "items": items,
     }

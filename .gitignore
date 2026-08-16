@@ -248,8 +248,5 @@ Thumbs.db
 # Research examples (local development only)
 /examples/research/
 
-# Metrics and paper experiments (local development only)
-/tests/test_metrics.py
-
 # Kilo configuration (local development only)
 kilo.json

@@ -397,6 +397,18 @@ def process_media(input_path: str, output_path: str, process_function: Callable[
             processed_frame = processed[0]
         else:
             processed_frame = processed
+        if split_direction and not skip_split_concat:
+            if split_direction.endswith("-full"):
+                axis = 1 if split_direction.startswith("vertical") else 0
+                processed_frame = np.concatenate((frame, processed_frame), axis=axis)
+            elif split_direction == "vertical":
+                w = frame.shape[1]
+                half = w // 2
+                processed_frame = np.concatenate((frame[:, :half], processed_frame[:, half:]), axis=1)
+            else:
+                h = frame.shape[0]
+                half = h // 2
+                processed_frame = np.concatenate((frame[:half, :], processed_frame[half:, :]), axis=0)
         output_dir = os.path.dirname(preview_path)
         if output_dir:
             os.makedirs(output_dir, exist_ok=True)

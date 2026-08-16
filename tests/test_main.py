@@ -19,6 +19,7 @@ from siss.main import (
     _configure_logging,
     _dispatch_effect,
     _resolve_colors,
+    _validate_args_and_paths,
     main,
     resolve_color_arg,
     validate_file_path,
@@ -188,6 +189,18 @@ class TestMainEntryPoint(unittest.TestCase):
         ):
             rc = main()
         self.assertEqual(rc, 1)
+
+    def test_preview_only_inputs_accept_preview_output(self):
+        args = _ns(
+            input=__file__,
+            output=None,
+            effect="duotone",
+            preview_frame="2",
+            preview_output="preview.png",
+        )
+        input_path = _validate_args_and_paths(args)
+        self.assertEqual(input_path, __file__)
+        self.assertIsNone(args.output)
 
 
 class TestValidateFilePath(unittest.TestCase):
