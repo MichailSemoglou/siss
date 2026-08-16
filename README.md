@@ -10,6 +10,7 @@ and named two-color palettes.
 ![GitHub license](https://img.shields.io/github/license/MichailSemoglou/siss)
 ![Python version](https://img.shields.io/badge/python-3.9%2B-blue)
 ![PyPI version](https://img.shields.io/pypi/v/siss)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21961222.svg)](https://doi.org/10.5281/zenodo.21961222)
 [![PyPI Downloads](https://static.pepy.tech/personalized-badge/siss?period=total&units=INTERNATIONAL_SYSTEM&left_color=GREY&right_color=BLUE&left_text=downloads)](https://pepy.tech/projects/siss)
 ![GitHub issues](https://img.shields.io/github/issues/MichailSemoglou/siss)
 ![GitHub last commit](https://img.shields.io/github/last-commit/MichailSemoglou/siss)

@@ -1,6 +1,6 @@
 {
   "title": "Siss",
-  "description": "A command-line tool for applying duotone and halftone effects to video and still-image files. Version 1.1.0 improves preview handling, adds benchmark-report utilities, and strengthens the CLI entry point and image-processing pipeline.",
+  "description": "A command-line tool for applying duotone and halftone effects to video and still-image files. Version 1.1.0 adds single-frame previews for video rendering.",
   "creators": [
     {
       "name": "Semoglou, Michail",
