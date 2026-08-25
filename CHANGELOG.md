@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `--extract-frame` CLI flag saves a single frame from a video input as a still image without applying any effect. Accepts an integer frame index or `first`, `middle`, `last`; the output path must be an image file, and `--effect` is not required.
+- `--extract-frame` CLI flag saves a single frame from a video input as a still image without applying any effect. Accepts an integer frame index or `first`, `middle`, `last`; the output path must be an image file, and the flag cannot be combined with `--effect` or `--preview-frame`.
 
 ### Fixed
 
