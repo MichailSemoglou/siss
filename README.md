@@ -158,7 +158,7 @@ Codec selection for video output is **automatic** — the tool probes available 
 
 ### Available Options
 
-- `--effect` – `duotone` or `halftone` (required)
+- `--effect` – `duotone` or `halftone`; required for rendering commands, not used with `--extract-frame`
 - `--color1` – first color: hex `#ff0044`, CSS name `rebeccapurple`, or RGB `255 0 0`. Default: red. Dark areas in duotone, symbols in halftone.
 - `--color2` – second color, same accepted forms. Default: cyan. Light areas in duotone, background in halftone.
 - `--palette` – named two-color palette (overrides the defaults; `--color1` and `--color2` override individual slots)
