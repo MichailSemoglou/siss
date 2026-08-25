@@ -5,6 +5,16 @@ All notable changes to the Siss project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-08-25
+
+### Added
+
+- `--extract-frame` CLI flag saves a single frame from a video input as a still image without applying any effect. Accepts an integer frame index or `first`, `middle`, `last`; the output path must be an image file, and the flag cannot be combined with `--effect` or `--preview-frame`.
+
+### Fixed
+
+- `docs/llm-prompt.md` described `symbol_size` as the pixel size of the largest symbol; it actually sets the sampling grid pitch, and the largest symbol radius is half the pitch minus one pixel. The prompt now documents the pitch and tone-level math, the ink-coverage differences between symbol types, and the washed-out interaction between gamma above 1.0 and sizes below 12. The newspaper and dream-wash example grammars use sizes that render as described.
+
 ## [1.1.0] - 2026-08-16
 
 ### Added

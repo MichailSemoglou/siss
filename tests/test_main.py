@@ -25,6 +25,7 @@ from siss.main import (
     validate_file_path,
 )
 from siss.utils.video_processing import is_image_file
+from tests.helpers import make_test_video
 
 
 def _ns(**kwargs):
@@ -46,6 +47,7 @@ def _ns(**kwargs):
         constraints=None,
         dump_constraints=None,
         export_palette_preview=None,
+        extract_frame=None,
         verbose=0,
         quiet=False,
     )
@@ -819,6 +821,72 @@ class TestMainPalettePreview(unittest.TestCase):
             rc = main()
         self.assertEqual(rc, 0)
         self.assertTrue(os.path.isfile(self.preview_path))
+
+
+class TestMainExtractFrame(unittest.TestCase):
+    """Tests for the --extract-frame CLI flag."""
+
+    def setUp(self):
+        import tempfile
+
+        self.tmp = tempfile.TemporaryDirectory()
+        self.input_path = os.path.join(self.tmp.name, "clip.mp4")
+        self.output_path = os.path.join(self.tmp.name, "frame.png")
+        make_test_video(self.input_path, frames=5)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_extract_frame_writes_image_without_effect(self):
+        with mock.patch(
+            "sys.argv",
+            ["siss", self.input_path, self.output_path, "--extract-frame", "2"],
+        ):
+            rc = main()
+        self.assertEqual(rc, 0)
+        self.assertTrue(os.path.isfile(self.output_path))
+
+    def test_extract_frame_rejects_effect_combination(self):
+        with mock.patch(
+            "sys.argv",
+            [
+                "siss", self.input_path, self.output_path,
+                "--extract-frame", "2", "--effect", "duotone",
+            ],
+        ):
+            rc = main()
+        self.assertEqual(rc, 1)
+        self.assertFalse(os.path.exists(self.output_path))
+
+    def test_extract_frame_rejects_preview_frame_combination(self):
+        with mock.patch(
+            "sys.argv",
+            [
+                "siss", self.input_path, self.output_path,
+                "--extract-frame", "2", "--preview-frame", "3",
+            ],
+        ):
+            rc = main()
+        self.assertEqual(rc, 1)
+        self.assertFalse(os.path.exists(self.output_path))
+
+    def test_extract_frame_requires_image_output(self):
+        video_out = os.path.join(self.tmp.name, "out.mp4")
+        with mock.patch(
+            "sys.argv",
+            ["siss", self.input_path, video_out, "--extract-frame", "2"],
+        ):
+            rc = main()
+        self.assertEqual(rc, 1)
+        self.assertFalse(os.path.exists(video_out))
+
+    def test_extract_frame_missing_output_fails(self):
+        with mock.patch(
+            "sys.argv",
+            ["siss", self.input_path, "--extract-frame", "2"],
+        ):
+            rc = main()
+        self.assertEqual(rc, 1)
 
 
 class TestMainSplitView(unittest.TestCase):

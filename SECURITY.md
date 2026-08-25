@@ -4,11 +4,11 @@
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.1.x   | :white_check_mark: |
-| 1.0.x   | :x:                |
-| < 1.0   | :x:                |
+| 1.2.x   | :white_check_mark: |
+| 1.1.x   | :x:                |
+| < 1.1   | :x:                |
 
-Current release: `1.1.0`.
+Current release: `1.2.0`.
 
 ## Trust Model
 
