@@ -104,9 +104,10 @@ Two practical consequences:
   Pair gamma above 1.0 with `symbol_size` of at least 12, and prefer 16
   or more when the source has important midtone detail.
 
-On frames narrower than about 20 times `symbol_size`, the renderer clamps
-the effective size so the grid fits the width; for HD sources and larger
-this only matters above `symbol_size` 48.
+On frames narrower than 20 times `symbol_size`, the renderer clamps the
+effective size so the grid fits the width. The clamp engages above
+`frame_width // 20`: above `symbol_size` 64 for 1280-pixel frames and
+above 96 for 1920-pixel frames.
 
 ### Luminance curve gamma
 
