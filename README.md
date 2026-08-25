@@ -26,6 +26,7 @@ and named two-color palettes.
 - **Audio passthrough** – after rendering, merges the original audio track into the output with `ffmpeg` (no video re-encode); disable with `--no-audio`
 - **Output formats** – writes MP4, MOV, AVI, MKV, and WMV videos, plus PNG, JPEG, BMP, TIFF, and WebP still images; the format is inferred from the output file extension
 - **Frame previews** – extract one frame from a video with `--preview-frame middle` or a numeric index and save it with `--preview-output` for fast iteration without waiting for a full render
+- **Frame extraction** – save a single frame from a video as a still image with `--extract-frame`, without applying any effect
 - **Custom palettes** – load your own two-color looks from a JSON file with `--palette-file`; custom names shadow built-in ones
 
 ## Installation
@@ -170,6 +171,7 @@ Codec selection for video output is **automatic** — the tool probes available 
 - `--export-palette-preview` – render a PNG contact sheet of every palette as labeled swatch pairs and save it to the given path; useful for design reviews
 - `--preview-frame` – process a single frame from a video input; accepts an integer frame index, a numeric string such as `48`, or `middle` for a quick preview render
 - `--preview-output` – save a preview frame to a separate image file when `--preview-frame` is used; if omitted, the main output path is used when it is an image file
+- `--extract-frame` – save a single frame from a video input as an image without applying any effect; accepts an integer frame index, `first`, `middle`, or `last`. The output path must be an image file, and `--effect` is not required
 - `--split-view` – stitch a before/after comparison into a single frame: `vertical` shows the left half of the original and the right half of the processed result at original dimensions; `horizontal` shows the top half of the original and the bottom half of the processed result. Append `-full` (`vertical-full`, `horizontal-full`) for the full-canvas mode that places the complete original alongside the complete processed frame at double the width or height. Use the `--split-alt-*` flags below to apply a different style to the alternate half, so one side can be noir and the other sunset
 - `--split-alt-constraints` – constraints file for the alternate half in `--split-view`. The alt side is processed with these settings instead of showing the original frame
 - `--split-alt-color1`, `--split-alt-color2` – override individual color slots for the alternate half
@@ -239,6 +241,12 @@ Preview a specific frame by index:
 
 ```bash
 siss input.mp4 output.mp4 --effect halftone --symbol_size 20 --symbol_type plus --grid_type square --color1 0 0 0 --color2 255 255 255 --preview-frame 48 --preview-output preview.png
+```
+
+Extract a single frame without applying an effect:
+
+```bash
+siss input.mp4 frame.png --extract-frame 48
 ```
 
 Run with a constraints file:
