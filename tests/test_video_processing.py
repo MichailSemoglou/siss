@@ -27,6 +27,7 @@ from siss.utils.video_processing import (
     process_image,
     process_media,
     process_video_frames,
+    save_frame,
 )
 from tests.helpers import make_test_video
 
@@ -369,6 +370,45 @@ class TestExtractFrame(unittest.TestCase):
         ) as video_fn:
             process_media("in.mp4", "out.mp4", lambda f: f, alpha=0.5)
         self.assertEqual(video_fn.call_args[1].get("alpha"), 0.5)
+
+
+class TestSaveFrame(unittest.TestCase):
+    """save_frame() writes a raw video frame to an image path."""
+
+    def test_writes_selected_frame_unprocessed(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_path = os.path.join(tmpdir, "clip.mp4")
+            output_path = os.path.join(tmpdir, "frame.png")
+            _write_marker_video(input_path, frames=5, marked_index=2, marker_color=[0, 255, 0])
+
+            save_frame(input_path, 2, output_path)
+
+            saved = cv2.imread(output_path)
+            self.assertIsNotNone(saved)
+            self.assertEqual(saved.shape[:2], (120, 160))
+            self.assertGreaterEqual(int(saved[30, 30, 1]), 200)
+            self.assertLessEqual(int(saved[30, 30, 0]), 50)
+
+    def test_middle_selector_writes_image(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_path = os.path.join(tmpdir, "clip.mp4")
+            output_path = os.path.join(tmpdir, "frame.png")
+            make_test_video(input_path, frames=5)
+
+            save_frame(input_path, "middle", output_path)
+
+            self.assertTrue(os.path.isfile(output_path))
+            saved = cv2.imread(output_path)
+            self.assertIsNotNone(saved)
+            self.assertEqual(saved.shape[:2], (120, 160))
+
+    def test_rejects_non_image_output(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_path = os.path.join(tmpdir, "clip.mp4")
+            make_test_video(input_path, frames=5)
+
+            with self.assertRaises(ValueError):
+                save_frame(input_path, 0, os.path.join(tmpdir, "frame.mp4"))
 
 
 class TestSafeInt(unittest.TestCase):

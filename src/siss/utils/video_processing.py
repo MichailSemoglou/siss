@@ -143,6 +143,38 @@ def is_image_file(file_path: str) -> bool:
     return os.path.splitext(file_path)[1].lower() in IMAGE_EXTENSIONS
 
 
+def save_frame(video_path: str, frame_selector: Union[int, str], output_path: str) -> None:
+    """
+    Extract a single frame from a video and save it as a still image.
+
+    The frame is written exactly as decoded; no effect is applied.
+    ``frame_selector`` accepts the same values as :func:`extract_frame`.
+
+    Args:
+        video_path (str): Path to the input video
+        frame_selector (int or str): Frame index, numeric string, or
+            'first', 'middle', 'last'
+        output_path (str): Image path to write; the extension picks
+            the format (``.png``, ``.jpg``, ...)
+
+    Raises:
+        ValueError: If output_path is not a still-image path
+        RuntimeError: If the frame cannot be read or written
+    """
+    if not is_image_file(output_path):
+        raise ValueError(
+            f"Extracted-frame output must be an image file, got {output_path!r}"
+        )
+    frame = extract_frame(video_path, frame_selector)
+    output_dir = os.path.dirname(output_path)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+    success = cv2.imwrite(output_path, frame)
+    if not success:
+        raise RuntimeError(f"Failed to write image file: {output_path}")
+    _log.info("Extracted frame saved to %s", output_path)
+
+
 def _validate_split_direction(split_direction: Optional[str]) -> None:
     """Raise ValueError for unsupported split_direction values."""
     valid = (None, "vertical", "horizontal", "vertical-full", "horizontal-full")

@@ -30,6 +30,7 @@ from .colors import (
 )
 from .duotone import apply_duotone
 from .halftone import GRID_TYPES, SYMBOL_TYPES, _validate_gamma, apply_halftone
+from .utils.video_processing import save_frame
 
 _GAMMA_DEFAULT = 1.0
 EFFECT_TYPES = ("duotone", "halftone")
@@ -224,6 +225,20 @@ def parse_arguments() -> Namespace:
         help=(
             "Path to save a single preview frame when --preview-frame is used. "
             "If omitted and the main output path is an image file, that path is used."
+        ),
+    )
+
+    parser.add_argument(
+        "--extract-frame",
+        type=str,
+        default=None,
+        metavar="SPEC",
+        help=(
+            "Save a single frame from a video input as an image, without "
+            "applying any effect. Accepts an integer frame index or "
+            "'first', 'middle', 'last'. The output path must be an image "
+            "file, and --effect is not required. Cannot be combined with "
+            "--effect or --preview-frame."
         ),
     )
 
@@ -650,6 +665,38 @@ def _dump_effective_constraints(params: Dict[str, Any], path: str) -> None:
         raise ValueError(f"Cannot write constraints file: {e}") from e
 
 
+def _run_extract_frame(args: Namespace) -> None:
+    """
+    Handle --extract-frame: write one raw video frame to an image path.
+
+    No effect is applied, so the flag cannot be combined with --effect or
+    --preview-frame.
+
+    Raises ValueError on conflicting flags, missing paths, or a non-image
+    output path.
+    """
+    if args.effect is not None:
+        raise ValueError(
+            "--extract-frame saves the frame unprocessed; do not pass --effect"
+        )
+    if getattr(args, "preview_frame", None) is not None:
+        raise ValueError("--extract-frame cannot be combined with --preview-frame")
+
+    missing = []
+    if not args.input:
+        missing.append("input")
+    if not args.output:
+        missing.append("output")
+    if missing:
+        raise ValueError(
+            "Missing required argument(s): " + ", ".join(missing)
+        )
+
+    input_path = validate_file_path(args.input, check_exists=True)
+    output_path = _validate_output_path(args.output)
+    save_frame(input_path, args.extract_frame, output_path)
+
+
 def _validate_args_and_paths(args: Namespace) -> str:
     """
     Validate that required args are present and return the resolved input path.
@@ -822,6 +869,10 @@ def main() -> int:
 
         if args.export_palette_preview:
             export_palette_preview(_validate_output_path(args.export_palette_preview), custom_palettes)
+            return 0
+
+        if args.extract_frame is not None:
+            _run_extract_frame(args)
             return 0
 
         params = _resolve_params(args, constraints, custom_palettes)
