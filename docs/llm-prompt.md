@@ -17,7 +17,7 @@ through to Siss defaults. Unknown keys are rejected with an error.
   "color2":           color,        background / light-area color
   "symbol_type":      string,       "plus" | "asterisk" | "slash" | "dot" | "ring"
   "grid_type":        string,       "square" | "hex"
-  "symbol_size":      integer,      >=1, pixels for the largest symbol
+  "symbol_size":      integer,      >=1, sets the grid pitch (see below)
   "luminance_curve": {
       "gamma":        number,       >0, linear at 1.0
   }
@@ -54,6 +54,13 @@ the halftone effect. `"duotone"` is supported for completeness but only
 At sizes below 3 pixels the distinction between `dot` and `ring` collapses;
 choose `dot` for small-scale work.
 
+Symbols differ in how much ink they lay down at a given size. `dot` fills
+its area and carries the most ink; `ring` draws only the outline; `plus`,
+`asterisk`, and `slash` are one-pixel strokes, with `slash` the faintest.
+At equal `symbol_size` and gamma, a `slash` render looks markedly lighter
+than a `dot` render. Choose filled shapes for tonal density and strokes
+for texture.
+
 ### Grid type
 
 | Value    | Behavior                                              |
@@ -66,17 +73,47 @@ choose `dot` for small-scale work.
 
 ### Symbol size
 
-The size in pixels of the largest symbol. Actual sizes scale linearly from
-zero (for white) to `symbol_size` (for black), modulated by the luminance
-curve gamma. Typical values range from 6 to 20. Values above 30 produce
-chunky, low-resolution grids.
+`symbol_size` sets the sampling grid pitch, not the symbol diameter. The
+renderer derives both from it:
+
+```text
+pitch      = symbol_size // 2            (minimum 4 px)
+max radius = pitch // 2 - 1              (pixels)
+```
+
+Per cell, the symbol radius is `int(max_radius * (1 - luminance/255) ^ gamma)`,
+truncated to an integer. The number of perceptible tone levels is therefore
+`max_radius + 1`, including zero.
+
+| symbol_size | Grid pitch | Max radius | Tone levels |
+| ----------- | ---------- | ---------- | ----------- |
+| 4 – 11      | 4 – 5 px   | 1          | 2 (binary)  |
+| 12 – 15     | 6 – 7 px   | 2          | 3           |
+| 16 – 19     | 8 – 9 px   | 3          | 4           |
+| 20 – 23     | 10 – 11 px | 4          | 5           |
+| 24 – 29     | 12 – 14 px | 5 – 6      | 6 – 7       |
+| 30 – 39     | 15 – 19 px | 6 – 8      | 7 – 9       |
+
+Two practical consequences:
+
+- Below 12 the grid is binary: a cell either carries a one-pixel-radius
+  symbol or nothing. Smooth tonal gradients are impossible at these sizes.
+- Integer truncation interacts with gamma. With max radius 1 and gamma
+  above 1.0, the truncated radius is 0 for every luminance above pure
+  black, so almost no symbols are drawn and the output looks washed out.
+  Pair gamma above 1.0 with `symbol_size` of at least 12, and prefer 16
+  or more when the source has important midtone detail.
+
+On frames narrower than about 20 times `symbol_size`, the renderer clamps
+the effective size so the grid fits the width; for HD sources and larger
+this only matters above `symbol_size` 48.
 
 ### Luminance curve gamma
 
 ```text
 gamma = 0.2    extreme shadow amplification, nearly uniform grid
 gamma = 0.5    pronounced shadow amplification
-gamma = 0.8    mild amplification (example file default)
+gamma = 0.8    mild amplification
 gamma = 1.0    linear, unchanged from standard Siss
 gamma = 1.5    mild shadow suppression
 gamma = 2.0    pronounced shadow suppression, high contrast
@@ -84,9 +121,10 @@ gamma = 3.0    extreme shadow crushing
 ```
 
 The gamma exponent is applied to the normalized luminance before the symbol
-size is computed: `size = max_size * (1 - luminance/255) ^ gamma`. Values
-above 1.0 suppress symbol growth in dark regions (midtones and shadows merge
-toward black). Values below 1.0 amplify growth (shadows bloom outward).
+size is computed: `size = int(max_radius * (1 - luminance/255) ^ gamma)`.
+Values above 1.0 suppress symbol growth in dark regions (midtones and
+shadows merge toward black). Values below 1.0 amplify growth (shadows
+bloom outward).
 
 ## How to author a grammar from a description
 
@@ -113,11 +151,16 @@ off-black read better in rendered output.
 
 | Desired outcome                         | Gamma range |
 | --------------------------------------- | ----------- |
-| Soft, washed-out, dreamy                | 0.5 – 0.7   |
+| Shadow bloom, soft dense darks          | 0.5 – 0.7   |
 | Mild shadow bloom, slight amplification | 0.8 – 0.9   |
 | Linear, neutral, no bias                | 1.0         |
 | High contrast, stark, graphic           | 1.5 – 2.0   |
 | Crushed shadows, silhouette             | 2.0 – 3.0   |
+
+Washed out is not a gamma setting on its own. It comes from gamma above
+1.0 paired with a small `symbol_size`, where integer truncation leaves
+few tone levels and faint marks, or from a low-contrast color pair. Gamma
+below 1.0 moves in the opposite direction, adding ink to shadows.
 
 ### Step 4: Pick grid and symbol
 
@@ -131,12 +174,17 @@ off-black read better in rendered output.
 
 ### Step 5: Size for the medium
 
-| Use case               | symbol_size |
-| ---------------------- | ----------- |
-| Social-media thumbnail | 4 – 8       |
-| Standard web image     | 8 – 14      |
-| Print at magazine size | 10 – 20     |
-| Large-format poster    | 15 – 30     |
+Larger `symbol_size` means a coarser grid with more tone levels; smaller
+means a finer grid with fewer levels. Choose by that trade-off, not by
+output medium alone.
+
+| Look                           | symbol_size | Tone levels |
+| ------------------------------ | ----------- | ----------- |
+| Fine grain, texture over tone  | 8 – 12      | 2 – 3       |
+| Balanced tone and texture      | 12 – 20     | 3 – 5       |
+| Bold, poster-like tonal blocks | 20 – 40     | 5 – 10      |
+
+Above 40 the grid cells become visibly coarse at typical viewing distances.
 
 ## Examples
 
@@ -170,7 +218,7 @@ aggressive, `square` grid is rigid, gamma 2.0 crushes midtones into shadow.
   "color2": "#f5e6c8",
   "symbol_type": "dot",
   "grid_type": "hex",
-  "symbol_size": 10,
+  "symbol_size": 12,
   "luminance_curve": { "gamma": 0.8 }
 }
 ```
@@ -209,14 +257,15 @@ neutral gamma to keep midtones visible.
   "color2": "#fdf6e3",
   "symbol_type": "ring",
   "grid_type": "hex",
-  "symbol_size": 8,
+  "symbol_size": 16,
   "luminance_curve": { "gamma": 0.5 }
 }
 ```
 
 Explanation: low-contrast lavender on cream fades into the background,
 `ring` symbols leave open centers for an airy feel, `hex` for organic
-flow, gamma 0.5 amplifies the soft shadows.
+flow, gamma 0.5 amplifies the soft shadows. Size 16 gives the ring a
+three-pixel radius, large enough for the outline to read as a ring.
 
 ## Rules for the LLM
 
@@ -238,3 +287,10 @@ flow, gamma 0.5 amplifies the soft shadows.
    about the desired mood or period before generating a file.
 10. Do not attempt to describe what the output will look like in the JSON.
     The constraints file is a machine-readable spec, not a critique.
+11. Set `symbol_size` explicitly. The Siss default is 10, which produces
+    a binary two-level grid; 12 to 16 renders smooth tone reliably.
+12. Do not pair gamma above 1.0 with `symbol_size` below 12. Integer
+    truncation then leaves only pure-black cells with a symbol, and the
+    render looks washed out.
+13. For dense tonal areas prefer `dot`; `slash` and `asterisk` are
+    one-pixel strokes and carry little ink at small sizes.
