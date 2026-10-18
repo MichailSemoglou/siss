@@ -1,6 +1,6 @@
 {
   "title": "Siss",
-  "description": "A command-line tool for applying duotone and halftone effects to video and still-image files. Version 1.2.0 adds still-image frame extraction from video inputs.",
+  "description": "A command-line tool for applying duotone and halftone effects to video and still-image files. Version 1.2.1 fixes a scale inversion in the halftone loss map that scored flat white and flat black inputs as maximum loss.",
   "creators": [
     {
       "name": "Semoglou, Michail",
@@ -9,8 +9,8 @@
     }
   ],
   "license": "MIT",
-  "version": "1.2.0",
-  "publication_date": "2026-08-25",
+  "version": "1.2.1",
+  "publication_date": "2026-10-18",
   "keywords": [
     "halftone",
     "duotone",

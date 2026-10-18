@@ -5,6 +5,12 @@ All notable changes to the Siss project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-10-18
+
+### Fixed
+
+- The halftone `--loss-map` output compared source luminance against quantized symbol size on mismatched scales, so flat white and flat black inputs scored maximum loss. The comparison now uses source darkness on the same 0-255 scale as mark size, and faithfully reproduced flat fields score zero.
+
 ## [1.2.0] - 2026-08-25
 
 ### Added
