@@ -47,8 +47,8 @@ def _make_halftone_processor(
     loss_map : bool, optional
         When True, the closure returns a (rendered, loss_map) tuple. The loss
         map is a grayscale uint8 frame at the same resolution as the input,
-        encoding per-cell divergence between source luminance and quantized
-        symbol size as a brightness value.
+        encoding per-cell divergence between source darkness and quantized
+        mark size as a brightness value, bright where the render diverged.
     """
     background_color = validate_rgb(color2_rgb)[::-1]
     symbol_color = validate_rgb(color1_rgb)[::-1]
@@ -107,8 +107,10 @@ def _make_halftone_processor(
             if loss_map:
                 scale = max_size
                 for i, y0 in enumerate(block_ys):
+                    # Compare source darkness with rendered mark size, both
+                    # on the same 0-255 darkness scale.
                     row_losses = np.abs(
-                        means[i, :] - (sizes[i, :] / scale * 255.0)
+                        (255.0 - means[i, :]) - (sizes[i, :] / scale * 255.0)
                     )
                     if row_losses.size == 0:
                         continue

@@ -8,7 +8,7 @@
 | 1.1.x   | :x:                |
 | < 1.1   | :x:                |
 
-Current release: `1.2.0`.
+Current release: `1.2.1`.
 
 ## Trust Model
 
